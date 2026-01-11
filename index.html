@@ -175,6 +175,12 @@
             appearance: none;
             text-align: center;
         }
+
+        /* 修正備註欄在手機上溢出的樣式 */
+        #formNote {
+            box-sizing: border-box;
+            max-width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -285,7 +291,7 @@
                 <div class="glass-panel p-6 rounded-[32px] space-y-4">
                     <div class="flex gap-4">
                         <input type="date" id="formDate" class="bg-transparent flex-1 text-white font-bold outline-none">
-                        <input type="text" id="formNote" placeholder="輸入備註..." class="bg-transparent flex-[2] text-white font-bold outline-none text-right">
+                        <input type="text" id="formNote" placeholder="輸入備註..." class="bg-transparent w-full flex-[2] text-white font-bold outline-none text-right">
                     </div>
                 </div>
                 <div class="flex gap-4">
@@ -371,9 +377,7 @@
         let myChart = null;
 
         window.onload = () => {
-            // 自動清理兩年前的舊資料
             cleanExpiredData();
-            
             applyTheme(state.themeId);
             lucide.createIcons();
             updateHUDDate();
@@ -385,7 +389,6 @@
             renderAll();
         };
 
-        // 新增：核心自動清理功能 (2年 = 730天)
         function cleanExpiredData() {
             const now = new Date();
             const TWO_YEARS_MS = 2 * 365 * 24 * 60 * 60 * 1000;
@@ -398,7 +401,6 @@
             });
             
             if (state.transactions.length !== initialCount) {
-                console.log(`系統清理了 ${initialCount - state.transactions.length} 筆過期資料`);
                 save();
             }
         }
@@ -642,7 +644,6 @@
             const date = document.getElementById('formDate').value;
             if(!amt || !date) return;
 
-            // 存入前先過濾掉過期資料 (預防機制)
             cleanExpiredData();
 
             const catObj = state.categories.find(c => c.name === state.tempCat);
