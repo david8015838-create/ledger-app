@@ -838,6 +838,25 @@
                         <p id="authMessageText" class="text-sm font-bold text-white"></p>
                     </div>
 
+                    <!-- iOS Standalone Mode Warning -->
+                    <div id="iosStandaloneWarning" class="hidden bg-yellow-500/10 border border-yellow-500/30 rounded-[24px] p-6 space-y-3">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">⚠️</span>
+                            <h3 class="text-sm font-black text-yellow-400">iOS 主畫面 App 使用提示</h3>
+                        </div>
+                        <p class="text-[11px] text-yellow-400/80 leading-relaxed">
+                            如果您是從 iOS 主畫面開啟此 App，Magic Link 登入可能會在瀏覽器中開啟而無法回到此處。
+                        </p>
+                        <div class="bg-white/5 rounded-2xl p-4 space-y-2">
+                            <p class="text-[10px] font-black text-white uppercase">建議作法：</p>
+                            <ol class="text-[10px] text-white/70 space-y-1 text-left ml-4 list-decimal">
+                                <li>在 Safari 中開啟此網站並完成登入</li>
+                                <li>登入後再回到主畫面 App 使用</li>
+                                <li>或選擇「僅使用本地模式」跳過登入</li>
+                            </ol>
+                        </div>
+                    </div>
+
                     <!-- Skip Login (Local Mode) -->
                     <div class="text-center">
                         <button onclick="skipLogin()" class="text-[10px] text-white/20 hover:text-white/40 font-bold uppercase tracking-widest transition-colors">
@@ -2119,7 +2138,21 @@
 
                 if (error) throw error;
 
-                showAuthMessage(`✅ 登入連結已發送至 ${email}<br>請檢查您的信箱並點擊連結完成登入`, 'success');
+                // 檢測是否在 iOS Standalone 模式
+                const isIOSStandalone = window.navigator.standalone === true || 
+                                        (window.matchMedia('(display-mode: standalone)').matches && 
+                                         /iPhone|iPad|iPod/.test(navigator.userAgent));
+                
+                if (isIOSStandalone) {
+                    showAuthMessage(`✅ 登入連結已發送至 ${email}<br><br>
+                        <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mt-3 text-left">
+                            <p class="text-[10px] font-black text-yellow-400 uppercase mb-2">⚠️ iOS 主畫面 App 提示</p>
+                            <p class="text-[10px] text-yellow-400/80 mb-3">請在 Safari 瀏覽器中開啟信箱連結完成登入，然後再回到此 App。</p>
+                            <p class="text-[10px] text-white/60">或選擇下方「僅使用本地模式」跳過登入。</p>
+                        </div>`, 'success');
+                } else {
+                    showAuthMessage(`✅ 登入連結已發送至 ${email}<br>請檢查您的信箱並點擊連結完成登入`, 'success');
+                }
                 
                 // Clear email input
                 if (type === 'signin') {
@@ -2194,6 +2227,19 @@
             document.getElementById('page-add').classList.add('hidden-page');
             document.getElementById('header-ui').classList.add('hidden');
             document.getElementById('nav-container').classList.add('hidden');
+            
+            // 檢測是否在 iOS Standalone 模式（從主畫面開啟）
+            const isIOSStandalone = window.navigator.standalone === true || 
+                                    (window.matchMedia('(display-mode: standalone)').matches && 
+                                     /iPhone|iPad|iPod/.test(navigator.userAgent));
+            
+            const warningEl = document.getElementById('iosStandaloneWarning');
+            if (isIOSStandalone && warningEl) {
+                warningEl.classList.remove('hidden');
+            } else if (warningEl) {
+                warningEl.classList.add('hidden');
+            }
+            
             lucide.createIcons();
         }
 
