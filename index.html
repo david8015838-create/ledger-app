@@ -2099,20 +2099,9 @@
                 document.getElementById('histMonth').value = currentMonth;
 
                 // 6. 决定显示哪个页面
-                if (!state.isLoggedIn && supabaseClient) {
-                    // 如果 Supabase 已配置但用户未登录，显示登录页面
-                    const hasLocalData = state.transactions.length > 0 || state.categories.length > 5;
-                    if (!hasLocalData) {
-                        // 新用户，显示登录页面
-                        showAuthPage();
-                    } else {
-                        // 有本地数据的用户，直接进入主应用（允许本地使用）
-                        showMainApp();
-                    }
-                } else {
-                    // 已登入或本地模式，顯示主應用
-                    showMainApp();
-                }
+                // 所有用戶（包括新用戶）都直接進入主應用，鼓勵使用本地模式
+                // 如果需要雲端同步，可以在設定頁面手動登入
+                showMainApp();
 
                 // 7. 更新同步 UI
                 updateSyncUI();
