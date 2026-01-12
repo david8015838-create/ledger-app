@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
 
@@ -58,6 +59,23 @@
         }
 
         .hidden-page { display: none !important; }
+
+        /* Auth Page Styles */
+        .auth-tab-active {
+            background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
+            color: white;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+
+        .auth-tab-inactive {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.3);
+            border: 1px solid transparent;
+        }
+
+        .auth-tab-inactive:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
 
         .nav-dock-container {
             position: fixed;
@@ -117,10 +135,11 @@
         
         .flask-container {
             position: relative;
-            width: 140px;
-            height: 180px;
+            width: 150px;
+            height: 200px;
             margin: 0 auto;
-            animation: flask-sway 4s ease-in-out infinite;
+              animation: flask-sway 7s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+            filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.4));
         }
 
         .flask {
@@ -128,73 +147,456 @@
             bottom: 0;
             left: 50%;
             transform: translateX(-50%);
-            width: 120px;
-            height: 140px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 20% 20% 40% 40%;
-            border: 3px solid rgba(255, 255, 255, 0.2);
+            width: 130px;
+            height: 160px;
+            background: linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.02) 0%,
+                rgba(255, 255, 255, 0.005) 50%,
+                rgba(255, 255, 255, 0.02) 100%);
+            border-radius: 18% 18% 45% 45%;
+            border: 2.5px solid rgba(255, 255, 255, 0.3);
+            border-left-color: rgba(255, 255, 255, 0.4);
+            border-right-color: rgba(255, 255, 255, 0.15);
             overflow: hidden;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(12px);
             z-index: 2;
+            box-shadow: 
+                inset -20px 0 35px rgba(0, 0, 0, 0.25),
+                inset 20px 0 35px rgba(255, 255, 255, 0.08),
+                inset 0 -15px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .flask::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                rgba(255, 255, 255, 0.03) 25%,
+                transparent 50%,
+                rgba(0, 0, 0, 0.05) 75%,
+                transparent 100%);
+            pointer-events: none;
         }
 
         .flask-neck {
             position: absolute;
-            top: 10px;
+            top: 5px;
             left: 50%;
             transform: translateX(-50%);
-            width: 40px;
-            height: 50px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 3px solid rgba(255, 255, 255, 0.2);
+            width: 45px;
+            height: 60px;
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.03) 0%,
+                rgba(255, 255, 255, 0.01) 100%);
+            border: 2.5px solid rgba(255, 255, 255, 0.3);
+            border-left-color: rgba(255, 255, 255, 0.4);
+            border-right-color: rgba(255, 255, 255, 0.15);
             border-bottom: none;
-            border-radius: 8px 8px 0 0;
+            border-radius: 10px 10px 0 0;
             z-index: 1;
+            backdrop-filter: blur(12px);
+            box-shadow: 
+                inset -10px 0 20px rgba(0, 0, 0, 0.2),
+                inset 10px 0 20px rgba(255, 255, 255, 0.08);
+        }
+
+        .flask-neck::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px 10px 0 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .flask-measurements {
+            position: absolute;
+            right: 8px;
+            top: 20%;
+            height: 60%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 3;
+            opacity: 0.3;
+        }
+
+        .measurement-line {
+            width: 12px;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .measurement-line.major {
+            width: 18px;
+            height: 1.5px;
+            background: rgba(255, 255, 255, 0.6);
         }
 
         .liquid {
             position: absolute;
             bottom: 0;
-            left: -50%;
-            width: 200%;
+            left: 0;
+            right: 0;
+            width: 100%;
             height: 0%;
-            background: linear-gradient(to top, #1d4ed8, #60a5fa);
-            transition: height 1.5s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: inset 0 20px 30px rgba(255,255,255,0.2);
+            background: transparent;
+            transition: height 2s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: visible;
         }
 
-        .liquid::after {
-            content: "";
+        .liquid-fill {
             position: absolute;
-            top: -15px;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(ellipse at 30% 40%, 
+                    var(--liquid-color-light, #60a5fa) 0%,
+                    transparent 60%),
+                radial-gradient(ellipse at 70% 60%, 
+                    var(--liquid-color-mid, #2563eb) 0%,
+                    transparent 50%),
+                linear-gradient(to top, 
+                    var(--liquid-color-dark, #1d4ed8) 0%,
+                    var(--liquid-color-mid, #2563eb) 50%,
+                    var(--liquid-color-light, #60a5fa) 100%);
+            transition: background 1.2s ease;
+            box-shadow: 
+                inset 0 20px 30px rgba(255,255,255,0.2),
+                inset 0 -10px 25px rgba(0,0,0,0.3),
+                inset -15px 0 25px rgba(0,0,0,0.15),
+                inset 15px 0 20px rgba(255,255,255,0.12);
+            animation: liquid-shimmer 4s ease-in-out infinite;
+        }
+
+        .liquid-surface {
+            position: absolute;
+            top: -25px;
+            left: -10%;
+            width: 120%;
+            height: 50px;
+            background: transparent;
+            z-index: 10;
+        }
+
+        .wave-layer {
+            position: absolute;
+            top: 0;
             left: 0;
             width: 200%;
-            height: 30px;
-            background: rgba(96, 165, 250, 0.6);
+            height: 100%;
+            background: 
+                radial-gradient(ellipse 100% 50% at 25% 50%, 
+                    var(--liquid-color-light, #60a5fa) 0%,
+                    var(--liquid-color-mid, #2563eb) 40%,
+                    transparent 70%);
             filter: url('#liquid-filter');
-            animation: wave-motion 2s linear infinite;
+        }
+
+        .wave-layer:nth-child(1) {
+            animation: wave-flow-1 4s ease-in-out infinite;
+            opacity: 0.9;
+        }
+
+        .wave-layer:nth-child(2) {
+            animation: wave-flow-2 5s ease-in-out infinite reverse;
+            opacity: 0.7;
+        }
+
+        .wave-layer:nth-child(3) {
+            animation: wave-flow-3 6s ease-in-out infinite;
+            opacity: 0.5;
+        }
+
+        @keyframes liquid-shimmer {
+            0% {
+                filter: brightness(1) saturate(1) contrast(1);
+                transform: translateX(0) scale(1);
+            }
+            25% {
+                filter: brightness(1.08) saturate(1.12) contrast(1.05);
+                transform: translateX(2px) scale(1.005);
+            }
+            50% {
+                filter: brightness(1.15) saturate(1.2) contrast(1.08);
+                transform: translateX(0) scale(1.01);
+            }
+            75% {
+                filter: brightness(1.08) saturate(1.12) contrast(1.05);
+                transform: translateX(-2px) scale(1.005);
+            }
+            100% {
+                filter: brightness(1) saturate(1) contrast(1);
+                transform: translateX(0) scale(1);
+            }
+        }
+
+        @keyframes wave-flow-1 {
+            0% { 
+                transform: translateX(0) translateY(0) rotate(0deg) scaleX(1);
+            }
+            20% { 
+                transform: translateX(-8%) translateY(-5px) rotate(2deg) scaleX(1.05);
+            }
+            40% { 
+                transform: translateX(-16%) translateY(2px) rotate(-1deg) scaleX(0.98);
+            }
+            60% { 
+                transform: translateX(-24%) translateY(-4px) rotate(1deg) scaleX(1.03);
+            }
+            80% { 
+                transform: translateX(-32%) translateY(1px) rotate(-2deg) scaleX(1.02);
+            }
+            100% { 
+                transform: translateX(-40%) translateY(0) rotate(0deg) scaleX(1);
+            }
+        }
+
+        @keyframes wave-flow-2 {
+            0% { 
+                transform: translateX(0) translateY(0) scaleY(1) scaleX(1);
+            }
+            25% { 
+                transform: translateX(-10%) translateY(-6px) scaleY(1.2) scaleX(1.08);
+            }
+            50% { 
+                transform: translateX(-20%) translateY(3px) scaleY(0.85) scaleX(0.95);
+            }
+            75% { 
+                transform: translateX(-30%) translateY(-5px) scaleY(1.15) scaleX(1.05);
+            }
+            100% { 
+                transform: translateX(-40%) translateY(0) scaleY(1) scaleX(1);
+            }
+        }
+
+        @keyframes wave-flow-3 {
+            0% { 
+                transform: translateX(0) translateY(0) rotate(0deg);
+            }
+            33% { 
+                transform: translateX(-13%) translateY(-3px) rotate(-1.5deg);
+            }
+            66% { 
+                transform: translateX(-26%) translateY(2px) rotate(1deg);
+            }
+            100% { 
+                transform: translateX(-40%) translateY(0) rotate(0deg);
+            }
+        }
+
+        .bubble {
+            position: absolute;
+            bottom: 0;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, 
+                rgba(255, 255, 255, 0.9), 
+                rgba(255, 255, 255, 0.5) 30%,
+                rgba(255, 255, 255, 0.1) 60%,
+                transparent);
+            box-shadow: 
+                inset -1px -1px 3px rgba(0, 0, 0, 0.15),
+                inset 1px 1px 2px rgba(255, 255, 255, 0.6),
+                0 2px 8px rgba(255, 255, 255, 0.2);
+            animation: bubble-rise linear infinite;
+            opacity: 0;
+            z-index: 5;
+        }
+
+        .bubble:nth-child(1) {
+            left: 15%;
+            width: 6px;
+            height: 6px;
+            animation-duration: 5s;
+            animation-delay: 0s;
+        }
+
+        .bubble:nth-child(2) {
+            left: 40%;
+            width: 4px;
+            height: 4px;
+            animation-duration: 6s;
+            animation-delay: 1.2s;
+        }
+
+        .bubble:nth-child(3) {
+            left: 65%;
+            width: 8px;
+            height: 8px;
+            animation-duration: 7s;
+            animation-delay: 2.5s;
+        }
+
+        .bubble:nth-child(4) {
+            left: 28%;
+            width: 5px;
+            height: 5px;
+            animation-duration: 5.5s;
+            animation-delay: 0.8s;
+        }
+
+        .bubble:nth-child(5) {
+            left: 55%;
+            width: 7px;
+            height: 7px;
+            animation-duration: 6.5s;
+            animation-delay: 1.8s;
         }
 
         .flask-glare {
             position: absolute;
             top: 10%;
             left: 15%;
-            width: 20%;
-            height: 60%;
-            background: linear-gradient(to bottom, rgba(255,255,255,0.2), transparent);
-            border-radius: 50px;
+            width: 25%;
+            height: 70%;
+            background: linear-gradient(145deg, 
+                rgba(255,255,255,0.5) 0%,
+                rgba(255,255,255,0.25) 30%,
+                rgba(255,255,255,0.08) 60%,
+                transparent 100%);
+            border-radius: 50% 30% 70% 40%;
             pointer-events: none;
-            z-index: 3;
+            z-index: 4;
+            filter: blur(2px);
+            animation: glare-pulse 3s ease-in-out infinite;
+        }
+
+        .flask-glare::before {
+            content: "";
+            position: absolute;
+            top: 8%;
+            left: 15%;
+            width: 35%;
+            height: 12%;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            filter: blur(4px);
+        }
+
+        .flask-glare::after {
+            content: "";
+            position: absolute;
+            top: 30%;
+            left: 10%;
+            width: 25%;
+            height: 8%;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            filter: blur(3px);
+        }
+
+        @keyframes glare-pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.85;
+            }
+        }
+
+        .flask-shadow {
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 20px;
+            background: radial-gradient(ellipse at center, 
+                rgba(0, 0, 0, 0.3) 0%,
+                transparent 70%);
+            filter: blur(8px);
+            z-index: 0;
+            animation: shadow-pulse 6s ease-in-out infinite;
         }
 
         @keyframes flask-sway {
-            0%, 100% { transform: rotate(-5deg) translateY(0); }
-            50% { transform: rotate(5deg) translateY(-5px); }
+            0% { transform: rotate(-10deg) translateY(0) translateX(0) scale(1); }
+            12.5% { transform: rotate(-7deg) translateY(-6px) translateX(3px) scale(1.008); }
+            25% { transform: rotate(-2deg) translateY(-10px) translateX(5px) scale(1.015); }
+            37.5% { transform: rotate(4deg) translateY(-12px) translateX(4px) scale(1.02); }
+            50% { transform: rotate(10deg) translateY(-14px) translateX(0) scale(1.025); }
+            62.5% { transform: rotate(7deg) translateY(-12px) translateX(-4px) scale(1.02); }
+            75% { transform: rotate(2deg) translateY(-8px) translateX(-5px) scale(1.015); }
+            87.5% { transform: rotate(-4deg) translateY(-4px) translateX(-3px) scale(1.008); }
+            100% { transform: rotate(-10deg) translateY(0) translateX(0) scale(1); }
         }
 
-        @keyframes wave-motion {
-            from { transform: translateX(0); }
-            to { transform: translateX(-50%); }
+        @keyframes wave-motion-primary {
+            0%, 100% { 
+                transform: translateX(0) translateY(0) scaleY(1);
+            }
+            25% { 
+                transform: translateX(-12%) translateY(-2px) scaleY(1.1);
+            }
+            50% { 
+                transform: translateX(-25%) translateY(0) scaleY(1);
+            }
+            75% { 
+                transform: translateX(-37%) translateY(-2px) scaleY(1.1);
+            }
+        }
+
+        @keyframes wave-motion-secondary {
+            0%, 100% { 
+                transform: translateX(0) translateY(0) rotate(0deg);
+            }
+            33% { 
+                transform: translateX(-15%) translateY(-3px) rotate(1deg);
+            }
+            66% { 
+                transform: translateX(-30%) translateY(0) rotate(-1deg);
+            }
+        }
+
+        @keyframes bubble-rise {
+            0% {
+                bottom: 0%;
+                opacity: 0;
+                transform: translateX(0) translateY(0) scale(0.5);
+            }
+            5% {
+                opacity: 0.8;
+                transform: translateX(2px) translateY(0) scale(1);
+            }
+            25% {
+                transform: translateX(8px) translateY(0) scale(1.05);
+            }
+            50% {
+                transform: translateX(-5px) translateY(0) scale(1.1);
+            }
+            75% {
+                transform: translateX(6px) translateY(0) scale(0.95);
+                opacity: 0.9;
+            }
+            95% {
+                opacity: 0.3;
+            }
+            100% {
+                bottom: 105%;
+                opacity: 0;
+                transform: translateX(-3px) translateY(0) scale(0.7);
+            }
+        }
+
+        @keyframes shadow-pulse {
+            0%, 100% { 
+                transform: translateX(-50%) scale(1);
+                opacity: 0.3;
+            }
+            50% { 
+                transform: translateX(-50%) scale(1.1);
+                opacity: 0.5;
+            }
         }
 
         .day-card { transition: all 0.3s ease; cursor: pointer; }
@@ -215,6 +617,26 @@
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         .theme-dot.active { border-color: white; transform: scale(1.1) rotate(45deg); box-shadow: 0 0 15px currentColor; }
+        
+        #currencyPicker button {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #currencyPicker button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        #currencyPicker button:hover::before {
+            left: 100%;
+        }
         .emoji-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; max-height: 300px; overflow-y: auto; padding: 10px; }
         .emoji-item { font-size: 1.5rem; padding: 12px; border-radius: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); transition: all 0.2s; cursor: pointer; text-align: center; }
         .emoji-item.selected { background: rgba(var(--accent-rgb), 0.2); border-color: var(--accent); transform: scale(1.1); }
@@ -222,6 +644,111 @@
         .history-item-row:active { transform: scale(0.98); background: rgba(255, 255, 255, 0.1); }
         .stats-item-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
         .stats-item-card:active { transform: scale(0.96); background: rgba(255, 255, 255, 0.1); }
+        
+        /* 自定义日期选择器样式 - 符合主题的毛玻璃风格 */
+        input[type="date"], input[type="month"] {
+            position: relative;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: white;
+            padding: 12px 18px;
+            border-radius: 16px;
+            outline: none;
+            font-weight: 800;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        input[type="date"]:hover, input[type="month"]:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        input[type="date"]:focus, input[type="month"]:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.2), 0 8px 16px rgba(0, 0, 0, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        input[type="date"]:active, input[type="month"]:active {
+            transform: translateY(0px);
+        }
+        
+        /* 自定义日期选择器图标 - 更明显的样式 */
+        input[type="date"]::-webkit-calendar-picker-indicator,
+        input[type="month"]::-webkit-calendar-picker-indicator {
+            filter: invert(1) brightness(1.2);
+            cursor: pointer;
+            opacity: 0.7;
+            transition: all 0.3s ease;
+            width: 18px;
+            height: 18px;
+            padding: 2px;
+            border-radius: 4px;
+        }
+        
+        input[type="date"]::-webkit-calendar-picker-indicator:hover,
+        input[type="month"]::-webkit-calendar-picker-indicator:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.1);
+        }
+        
+        /* 日期字段样式 - 更好的可读性 */
+        input[type="date"]::-webkit-datetime-edit,
+        input[type="month"]::-webkit-datetime-edit {
+            color: white;
+            font-weight: 800;
+        }
+        
+        input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+        input[type="month"]::-webkit-datetime-edit-fields-wrapper {
+            padding: 0;
+        }
+        
+        input[type="date"]::-webkit-datetime-edit-text,
+        input[type="month"]::-webkit-datetime-edit-text {
+            color: rgba(255, 255, 255, 0.5);
+            padding: 0 3px;
+            font-weight: 600;
+        }
+        
+        input[type="date"]::-webkit-datetime-edit-month-field,
+        input[type="date"]::-webkit-datetime-edit-day-field,
+        input[type="date"]::-webkit-datetime-edit-year-field,
+        input[type="month"]::-webkit-datetime-edit-month-field,
+        input[type="month"]::-webkit-datetime-edit-year-field {
+            color: white;
+            padding: 3px 4px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+        
+        input[type="date"]::-webkit-datetime-edit-month-field:hover,
+        input[type="date"]::-webkit-datetime-edit-day-field:hover,
+        input[type="date"]::-webkit-datetime-edit-year-field:hover,
+        input[type="month"]::-webkit-datetime-edit-month-field:hover,
+        input[type="month"]::-webkit-datetime-edit-year-field:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        input[type="date"]::-webkit-datetime-edit-month-field:focus,
+        input[type="date"]::-webkit-datetime-edit-day-field:focus,
+        input[type="date"]::-webkit-datetime-edit-year-field:focus,
+        input[type="month"]::-webkit-datetime-edit-month-field:focus,
+        input[type="month"]::-webkit-datetime-edit-year-field:focus {
+            background: rgba(var(--accent-rgb), 0.4);
+            border-radius: 6px;
+            color: white;
+            outline: none;
+            font-weight: 900;
+        }
     </style>
 </head>
 <body>
@@ -236,10 +763,8 @@
         
         <header id="header-ui" class="pt-12 px-8 pb-4 flex justify-between items-start z-20">
             <div class="flex flex-col">
-                <div class="flex items-baseline gap-2">
-                    <h1 class="brand-title text-3xl font-[900]">LEDGER<span class="text-[14px] font-normal align-top ml-0.5">™</span></h1>
-                </div>
-                <div class="by-owen font-bold mt-1">Designed by Owen</div>
+                <h1 class="brand-title text-3xl font-[900]">LEDGER<span class="text-[14px] font-normal align-top ml-0.5">™</span></h1>
+                <div class="by-owen font-bold mt-1 text-[10px] tracking-wider">DESIGNED BY OWEN  |  V2.0</div>
             </div>
             <button onclick="nav('settings')" class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mt-1 border border-white/10 hover:border-white/30 transition-colors">
                 <i data-lucide="user" class="w-5 h-5"></i>
@@ -248,6 +773,80 @@
 
         <main id="mainContainer" class="flex-1 overflow-y-auto px-6 no-scrollbar pb-32">
             
+            <!-- Login Page -->
+            <section id="page-auth" class="page-transition hidden-page min-h-screen flex items-center justify-center px-6 -mx-6 -mt-4">
+                <div class="w-full max-w-md space-y-8">
+                    <!-- Logo & Title -->
+                    <div class="text-center space-y-3">
+                        <div class="flex justify-center mb-6">
+                            <div class="w-20 h-20 rounded-full bg-gradient-to-br from-white/20 to-white/5 backdrop-blur-xl border border-white/20 flex items-center justify-center">
+                                <i data-lucide="sparkles" class="w-10 h-10 text-white"></i>
+                            </div>
+                        </div>
+                        <h1 class="text-4xl font-black text-white">LEDGER<span class="text-sm font-normal align-top ml-1">™</span></h1>
+                        <p class="text-sm text-white/40 font-bold uppercase tracking-wider">Personal Finance Tracker</p>
+                    </div>
+
+                    <!-- Auth Tabs -->
+                    <div class="glass-panel p-2 rounded-[32px] flex gap-2">
+                        <button id="tabSignIn" onclick="switchAuthTab('signin')" class="auth-tab-active flex-1 py-3 rounded-[24px] text-sm font-black transition-all">
+                            登入
+                        </button>
+                        <button id="tabSignUp" onclick="switchAuthTab('signup')" class="auth-tab-inactive flex-1 py-3 rounded-[24px] text-sm font-black transition-all">
+                            註冊
+                        </button>
+                    </div>
+
+                    <!-- Sign In Form -->
+                    <div id="formSignIn" class="space-y-6">
+                        <div class="glass-panel p-8 rounded-[32px] space-y-6">
+                            <div>
+                                <label class="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-3">Email</label>
+                                <input type="email" id="emailSignIn" placeholder="your@email.com" 
+                                    class="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-white/30 outline-none focus:border-white/30 transition-colors font-bold">
+                            </div>
+                            <button onclick="handleMagicLink('signin')" 
+                                class="w-full bg-gradient-to-r from-white/20 to-white/10 backdrop-blur-xl border border-white/20 text-white py-4 rounded-2xl font-black uppercase tracking-wider active:scale-95 transition-all hover:border-white/40">
+                                <span id="btnSignInText">✨ 發送登入連結</span>
+                            </button>
+                        </div>
+                        <p class="text-center text-[10px] text-white/30 leading-relaxed px-6">
+                            我們會將登入連結寄到您的信箱<br>點擊連結即可完成登入，無需密碼
+                        </p>
+                    </div>
+
+                    <!-- Sign Up Form -->
+                    <div id="formSignUp" class="space-y-6 hidden">
+                        <div class="glass-panel p-8 rounded-[32px] space-y-6">
+                            <div>
+                                <label class="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-3">Email</label>
+                                <input type="email" id="emailSignUp" placeholder="your@email.com" 
+                                    class="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-white/30 outline-none focus:border-white/30 transition-colors font-bold">
+                            </div>
+                            <button onclick="handleMagicLink('signup')" 
+                                class="w-full bg-gradient-to-r from-white/20 to-white/10 backdrop-blur-xl border border-white/20 text-white py-4 rounded-2xl font-black uppercase tracking-wider active:scale-95 transition-all hover:border-white/40">
+                                <span id="btnSignUpText">🚀 發送註冊連結</span>
+                            </button>
+                        </div>
+                        <p class="text-center text-[10px] text-white/30 leading-relaxed px-6">
+                            註冊即表示您同意我們的服務條款<br>您的數據將安全地儲存在雲端
+                        </p>
+                    </div>
+
+                    <!-- Status Messages -->
+                    <div id="authMessage" class="hidden glass-panel p-6 rounded-[24px] text-center">
+                        <p id="authMessageText" class="text-sm font-bold text-white"></p>
+                    </div>
+
+                    <!-- Skip Login (Local Mode) -->
+                    <div class="text-center">
+                        <button onclick="skipLogin()" class="text-[10px] text-white/20 hover:text-white/40 font-bold uppercase tracking-widest transition-colors">
+                            跳過，僅使用本地模式
+                        </button>
+                    </div>
+                </div>
+            </section>
+
             <section id="page-home" class="page-transition space-y-8 mt-4">
                 <div class="glass-panel p-8 rounded-[40px] flex flex-col items-center relative overflow-hidden">
                     <div class="w-full flex justify-between items-start mb-4">
@@ -256,19 +855,55 @@
                     </div>
 
                     <div class="flask-container mb-6">
+                        <div class="flask-shadow"></div>
                         <div class="flask-neck"></div>
                         <div class="flask">
+                            <div class="flask-measurements">
+                                <div class="measurement-line major"></div>
+                                <div class="measurement-line"></div>
+                                <div class="measurement-line"></div>
+                                <div class="measurement-line major"></div>
+                                <div class="measurement-line"></div>
+                                <div class="measurement-line"></div>
+                                <div class="measurement-line major"></div>
+                                <div class="measurement-line"></div>
+                                <div class="measurement-line"></div>
+                                <div class="measurement-line major"></div>
+                            </div>
                             <div class="flask-glare"></div>
-                            <div id="liquidLevel" class="liquid" style="height: 0%;"></div>
+                            <div id="liquidLevel" class="liquid" style="height: 0%;">
+                                <div class="liquid-fill">
+                                    <div class="bubble"></div>
+                                    <div class="bubble"></div>
+                                    <div class="bubble"></div>
+                                    <div class="bubble"></div>
+                                    <div class="bubble"></div>
+                                </div>
+                                <div class="liquid-surface">
+                                    <div class="wave-layer"></div>
+                                    <div class="wave-layer"></div>
+                                    <div class="wave-layer"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <div class="text-center">
                         <div class="flex items-baseline justify-center gap-1 mb-1">
-                            <span class="text-4xl font-black text-white" id="displaySpent">$0</span>
-                            <span class="text-[12px] text-white/30">/ <span id="displayBudgetLimit">$0</span></span>
+                            <span class="text-4xl font-black text-white" id="displayRemaining"></span>
                         </div>
-                        <p id="budgetMessage" class="text-[10px] font-bold uppercase tracking-widest opacity-40"></p>
+                        <div class="flex justify-center gap-6 mb-2">
+                            <div class="text-center">
+                                <div class="text-[9px] font-bold text-white/30 uppercase tracking-wider mb-1">Spent</div>
+                                <div class="text-sm font-black text-white/60" id="displaySpent"></div>
+                            </div>
+                            <div class="w-px bg-white/10"></div>
+                            <div class="text-center">
+                                <div class="text-[9px] font-bold text-white/30 uppercase tracking-wider mb-1">Budget</div>
+                                <div class="text-sm font-black text-white/60" id="displayBudgetLimit"></div>
+                            </div>
+                        </div>
+                        <p id="budgetMessage" class="text-[10px] font-bold uppercase tracking-widest transition-colors duration-300"></p>
                     </div>
                 </div>
 
@@ -311,6 +946,13 @@
                     </div>
                 </div>
                 <div class="glass-panel p-6 rounded-3xl space-y-4">
+                    <h3 class="text-xs font-black uppercase text-white/40 tracking-widest">Currency Setting</h3>
+                    <div class="space-y-2">
+                        <p class="text-[10px] text-white/40 font-bold ml-1">選擇顯示的幣值：</p>
+                        <div id="currencyPicker" class="grid grid-cols-3 gap-3"></div>
+                    </div>
+                </div>
+                <div class="glass-panel p-6 rounded-3xl space-y-4">
                     <h3 class="text-xs font-black uppercase text-white/40 tracking-widest">Budget Setting</h3>
                     <div class="space-y-1">
                         <p class="text-[10px] text-white/40 font-bold ml-1">在此設定您的每月消費預算上限：</p>
@@ -318,6 +960,58 @@
                     </div>
                     <button onclick="saveSettings()" class="w-full py-4 dynamic-accent-bg text-black rounded-2xl font-black shadow-lg">儲存預算變更</button>
                 </div>
+
+                <!-- 帳戶與雲端同步狀態 -->
+                <div class="glass-panel p-6 rounded-3xl space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xs font-black uppercase text-white/40 tracking-widest">Account & Sync</h3>
+                        <div id="syncStatusBadge" class="text-[8px] px-2 py-1 rounded-full font-black">
+                            <!-- 動態更新 -->
+                        </div>
+                    </div>
+                    
+                    <!-- 登入狀態顯示 -->
+                    <div id="authStatusPanel" class="space-y-3">
+                        <div class="flex items-center justify-between text-[10px]">
+                            <span class="text-white/40 font-bold">登入狀態：</span>
+                            <span id="authStatusText" class="text-white font-black">本地模式</span>
+                        </div>
+                        <div id="userEmailDisplay" class="hidden flex items-center justify-between text-[10px] bg-white/5 rounded-xl p-3">
+                            <span class="text-white/40 font-bold">帳戶：</span>
+                            <span id="userEmail" class="text-white/80 font-bold truncate ml-2"></span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="authActionBtn" onclick="showAuthPage()" class="flex-1 py-3 bg-gradient-to-r from-white/20 to-white/10 border border-white/20 text-white rounded-2xl font-black text-xs transition-all hover:border-white/40">
+                                🔐 登入雲端帳戶
+                            </button>
+                            <button onclick="showCloudInfoModal()" class="w-12 h-12 bg-white/10 border border-white/20 text-white rounded-2xl font-black text-xs transition-all hover:border-white/40 flex items-center justify-center">
+                                <i data-lucide="info" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 同步資訊（僅在登入後顯示） -->
+                    <div id="syncInfoPanel" class="hidden space-y-3 pt-3 border-t border-white/5">
+                        <div class="flex items-center justify-between text-[10px]">
+                            <span class="text-white/40 font-bold">本地資料：</span>
+                            <span id="localDataCount" class="text-white font-black">0 筆交易</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[10px]">
+                            <span class="text-white/40 font-bold">最後同步：</span>
+                            <span id="lastSyncDisplay" class="text-white font-black">從未同步</span>
+                        </div>
+                        <div id="syncErrorMessage" class="hidden text-[9px] text-red-400 bg-red-500/10 p-2 rounded-lg">
+                            <!-- 錯誤資訊 -->
+                        </div>
+                        <button id="manualSyncBtn" onclick="manualSync()" class="w-full py-3 bg-white/10 hover:bg-white/15 text-white rounded-2xl font-black text-xs transition-all">
+                            <span id="syncBtnText">🔄 立即同步到雲端</span>
+                        </button>
+                        <p class="text-[9px] text-white/30 text-center">
+                            💡 提示：應用會在打開時自動同步。雲端僅保留最近 365 天的資料，本地資料永久保留。
+                        </p>
+                    </div>
+                </div>
+
                 <div class="glass-panel p-6 rounded-3xl space-y-4">
                     <div class="flex justify-between items-center">
                         <h3 class="text-xs font-black uppercase text-white/40 tracking-widest">Categories</h3>
@@ -325,21 +1019,26 @@
                     </div>
                     <div id="settingsCatList" class="grid grid-cols-2 gap-2"></div>
                 </div>
-                <button onclick="clearAllData()" class="w-full py-4 text-red-500/30 text-[9px] font-black uppercase tracking-widest">Reset Terminal</button>
             </section>
 
             <section id="page-add" class="page-transition hidden-page space-y-8">
                 <div class="text-center pt-6">
                     <div class="flex items-center justify-center">
-                         <span class="text-xl font-black text-white/20 mr-2">NT$</span>
+                         <span id="currencySymbolAdd" class="text-xl font-black text-white/20 mr-2">NT$</span>
                          <input type="number" id="formAmount" placeholder="0" class="w-full max-w-[200px] bg-transparent text-6xl font-black text-center text-white outline-none">
                     </div>
                 </div>
+                <div>
+                    <p class="text-[9px] font-black text-white/20 uppercase tracking-widest mb-3 text-center">交易幣種</p>
+                    <div id="formCurrencyGrid" class="grid grid-cols-3 gap-3 mb-4"></div>
+                </div>
                 <div id="formCatGrid" class="grid grid-cols-4 gap-3"></div>
                 <div class="glass-panel p-6 rounded-[32px] space-y-4">
-                    <div class="flex gap-4">
-                        <input type="date" id="formDate" class="bg-transparent flex-1 text-white font-bold outline-none">
-                        <input type="text" id="formNote" placeholder="輸入備註..." class="bg-transparent w-full flex-[2] text-white font-bold outline-none text-right">
+                    <div class="flex gap-4 items-center">
+                        <div class="flex-1 min-w-[180px]">
+                            <input type="date" id="formDate" class="w-full text-white font-bold outline-none">
+                        </div>
+                        <input type="text" id="formNote" placeholder="輸入備註..." class="bg-transparent flex-[2] text-white font-bold outline-none text-right">
                     </div>
                 </div>
                 <div class="flex gap-4">
@@ -356,13 +1055,72 @@
                 <h2 class="text-xl font-black">新增分類</h2>
                 <input type="text" id="newCatName" placeholder="分類名稱" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5">
                 <div>
-                    <p class="text-[10px] font-bold text-white/40 uppercase mb-3">挑選圖示 (150+ 選項)</p>
+                    <p class="text-[10px] font-bold text-white/40 uppercase mb-3">挑選圖示 (130+ 選項)</p>
                     <div id="emojiPicker" class="emoji-grid no-scrollbar"></div>
                 </div>
                 <div class="flex gap-3">
                     <button onclick="closeCatModal()" class="flex-1 py-4 glass-panel rounded-2xl font-bold">取消</button>
                     <button id="confirmCatBtn" class="flex-1 py-4 dynamic-accent-bg text-black rounded-2xl font-black opacity-30 pointer-events-none">請選擇圖示</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- 雲端說明 Modal -->
+        <div id="cloudInfoModal" class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 hidden">
+            <div class="glass-panel w-full max-w-md rounded-[40px] p-8 space-y-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center">
+                        <i data-lucide="cloud" class="w-6 h-6 text-blue-400"></i>
+                    </div>
+                    <h2 class="text-xl font-black">雲端同步說明</h2>
+                </div>
+                
+                <div class="space-y-4 text-sm text-white/80">
+                    <div class="bg-white/5 rounded-2xl p-4 space-y-2">
+                        <div class="flex items-start gap-3">
+                            <span class="text-lg">💾</span>
+                            <div>
+                                <h3 class="font-black text-white mb-1">本地優先儲存</h3>
+                                <p class="text-xs text-white/60">所有資料優先儲存在您的裝置上，即使離線也能正常使用。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/5 rounded-2xl p-4 space-y-2">
+                        <div class="flex items-start gap-3">
+                            <span class="text-lg">☁️</span>
+                            <div>
+                                <h3 class="font-black text-white mb-1">雲端備份</h3>
+                                <p class="text-xs text-white/60">登入帳戶後，資料會自動同步到雲端，方便跨裝置使用。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4 space-y-2">
+                        <div class="flex items-start gap-3">
+                            <span class="text-lg">⏰</span>
+                            <div>
+                                <h3 class="font-black text-yellow-400 mb-1">資料保留期限</h3>
+                                <p class="text-xs text-yellow-400/80">雲端僅保留最近 <span class="font-black">365 天</span>的交易記錄，超過一年的資料會自動清理。</p>
+                                <p class="text-xs text-yellow-400/60 mt-2">💡 注意：本地資料不受影響，永久保留在您的裝置上。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/5 rounded-2xl p-4 space-y-2">
+                        <div class="flex items-start gap-3">
+                            <span class="text-lg">🔄</span>
+                            <div>
+                                <h3 class="font-black text-white mb-1">自動同步</h3>
+                                <p class="text-xs text-white/60">應用程式會在開啟時自動同步，您也可以手動點擊同步按鈕。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="closeCloudInfoModal()" class="w-full py-4 dynamic-accent-bg text-black rounded-2xl font-black">
+                    我知道了
+                </button>
             </div>
         </div>
 
@@ -391,29 +1149,442 @@
             { id: 'cyan', color: '#06b6d4', rgb: '6, 182, 212', opacity: 0.5, bg: '#020c0d' }
         ];
 
-        // 擴充至 150 種記帳常用 Emoji
+        const CURRENCY_OPTIONS = [
+            { id: 'TWD', symbol: 'NT$', name: '台幣 TWD', flag: '🇹🇼', rateToUSD: 0.032 },
+            { id: 'USD', symbol: '$', name: '美金 USD', flag: '🇺🇸', rateToUSD: 1 },
+            { id: 'SGD', symbol: 'S$', name: '新幣 SGD', flag: '🇸🇬', rateToUSD: 0.74 }
+        ];
+
+        // 汇率换算函数：将金额从一种货币转换为另一种货币
+        function convertCurrency(amount, fromCurrency, toCurrency) {
+            if (fromCurrency === toCurrency) return amount;
+            
+            const fromRate = CURRENCY_OPTIONS.find(c => c.id === fromCurrency)?.rateToUSD || 1;
+            const toRate = CURRENCY_OPTIONS.find(c => c.id === toCurrency)?.rateToUSD || 1;
+            
+            // 先转换为美元，再转换为目标货币
+            const amountInUSD = amount * fromRate;
+            return amountInUSD / toRate;
+        }
+
+        // 精選 130+ 個實用記帳 Emoji - 涵蓋所有生活場景
+        // ============================================
+        // Supabase 配置
+        // ============================================
+        const SUPABASE_CONFIG = {
+            url: 'https://ndtkurowumazsgdotlxb.supabase.co',
+            anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kdGt1cm93dW1henNnZG90bHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMzUwMzUsImV4cCI6MjA4MzgxMTAzNX0.tukEU-T8f8Sne7KRFOPBYgtlhalHWaPMJlZ_Qpa6J6E'
+        };
+
+        // 初始化 Supabase 客户端（如果配置了）
+        let supabaseClient = null;
+        let currentUser = null;
+        
+        if (SUPABASE_CONFIG.url !== 'YOUR_SUPABASE_URL' && SUPABASE_CONFIG.anonKey !== 'YOUR_SUPABASE_ANON_KEY') {
+            try {
+                supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+                console.log('✅ Supabase initialized');
+            } catch (error) {
+                console.warn('⚠️ Supabase initialization failed:', error);
+            }
+        } else {
+            console.warn('⚠️ Supabase not configured. Running in local-only mode.');
+        }
+
+        // ============================================
+        // IndexedDB 管理器（本地优先存储）
+        // ============================================
+        class LocalDatabase {
+            constructor() {
+                this.dbName = 'LedgerDB';
+                this.version = 1;
+                this.db = null;
+            }
+
+            async init() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, this.version);
+
+                    request.onerror = () => reject(request.error);
+                    request.onsuccess = () => {
+                        this.db = request.result;
+                        console.log('✅ IndexedDB initialized');
+                        resolve(this.db);
+                    };
+
+                    request.onupgradeneeded = (event) => {
+                        const db = event.target.result;
+
+                        // 创建 transactions 存储
+                        if (!db.objectStoreNames.contains('transactions')) {
+                            const txStore = db.createObjectStore('transactions', { keyPath: 'id' });
+                            txStore.createIndex('date', 'date', { unique: false });
+                            txStore.createIndex('category', 'category', { unique: false });
+                            txStore.createIndex('updated_at', 'updated_at', { unique: false });
+                        }
+
+                        // 创建 categories 存储
+                        if (!db.objectStoreNames.contains('categories')) {
+                            const catStore = db.createObjectStore('categories', { keyPath: 'name' });
+                            catStore.createIndex('name', 'name', { unique: true });
+                        }
+
+                        // 创建 settings 存储
+                        if (!db.objectStoreNames.contains('settings')) {
+                            db.createObjectStore('settings', { keyPath: 'key' });
+                        }
+
+                        // 创建 sync_metadata 存储
+                        if (!db.objectStoreNames.contains('sync_metadata')) {
+                            db.createObjectStore('sync_metadata', { keyPath: 'key' });
+                        }
+                    };
+                });
+            }
+
+            async get(storeName, key) {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([storeName], 'readonly');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.get(key);
+
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async getAll(storeName) {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([storeName], 'readonly');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.getAll();
+
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async put(storeName, data) {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([storeName], 'readwrite');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.put(data);
+
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async delete(storeName, key) {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([storeName], 'readwrite');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.delete(key);
+
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async clear(storeName) {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([storeName], 'readwrite');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.clear();
+
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async bulkPut(storeName, dataArray) {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([storeName], 'readwrite');
+                    const store = transaction.objectStore(storeName);
+                    let completed = 0;
+
+                    dataArray.forEach(data => {
+                        const request = store.put(data);
+                        request.onsuccess = () => {
+                            completed++;
+                            if (completed === dataArray.length) {
+                                resolve();
+                            }
+                        };
+                        request.onerror = () => reject(request.error);
+                    });
+                });
+            }
+        }
+
+        // 初始化本地資料庫
+        const localDB = new LocalDatabase();
+
+        // ============================================
+        // 同步管理器（本地 ↔ 雲端）
+        // ============================================
+        class SyncManager {
+            constructor(localDB, supabaseClient) {
+                this.localDB = localDB;
+                this.supabaseClient = supabaseClient;
+                this.isSyncing = false;
+                this.lastSyncTime = null;
+                this.syncError = null;
+            }
+
+            async getLastSyncTime() {
+                const metadata = await this.localDB.get('sync_metadata', 'lastSyncTime');
+                return metadata ? new Date(metadata.value) : null;
+            }
+
+            async setLastSyncTime(time) {
+                await this.localDB.put('sync_metadata', {
+                    key: 'lastSyncTime',
+                    value: time.toISOString()
+                });
+            }
+
+            async syncToCloud() {
+                if (!this.supabaseClient || !currentUser) {
+                    console.warn('⚠️ Sync skipped: Supabase not configured or user not logged in');
+                    this.syncError = 'offline';
+                    return { success: false, error: 'offline' };
+                }
+
+                if (this.isSyncing) {
+                    console.warn('⚠️ Sync already in progress');
+                    return { success: false, error: 'already_syncing' };
+                }
+
+                this.isSyncing = true;
+                this.syncError = null;
+                updateSyncUI();
+
+                try {
+                    console.log('🔄 Starting sync to cloud...');
+
+                    // 1. 同步交易记录
+                    const transactions = await this.localDB.getAll('transactions');
+                    if (transactions.length > 0) {
+                        const txData = transactions.map(tx => ({
+                            id: tx.id,
+                            user_id: currentUser.id,
+                            amount: tx.amount,
+                            date: tx.date,
+                            note: tx.note || '',
+                            category: tx.category,
+                            icon: tx.icon,
+                            currency: tx.currency || 'TWD',
+                            updated_at: tx.updated_at || new Date().toISOString()
+                        }));
+
+                        const { error: txError } = await this.supabaseClient
+                            .from('transactions')
+                            .upsert(txData, { onConflict: 'id' });
+
+                        if (txError) throw txError;
+                        console.log(`✅ Synced ${transactions.length} transactions`);
+                    }
+
+                    // 2. 同步分类
+                    const categories = await this.localDB.getAll('categories');
+                    if (categories.length > 0) {
+                        const catData = categories.map(cat => ({
+                            id: cat.id || crypto.randomUUID(),
+                            user_id: currentUser.id,
+                            name: cat.name,
+                            icon: cat.icon,
+                            color: cat.color,
+                            updated_at: cat.updated_at || new Date().toISOString()
+                        }));
+
+                        const { error: catError } = await this.supabaseClient
+                            .from('categories')
+                            .upsert(catData, { onConflict: 'id' });
+
+                        if (catError) throw catError;
+                        console.log(`✅ Synced ${categories.length} categories`);
+                    }
+
+                    // 3. 同步使用者設定
+                    const budgetSetting = await this.localDB.get('settings', 'budget');
+                    const themeSetting = await this.localDB.get('settings', 'themeId');
+                    const currencySetting = await this.localDB.get('settings', 'currency');
+
+                    const settingsData = {
+                        user_id: currentUser.id,
+                        budget: budgetSetting ? budgetSetting.value : 30000,
+                        theme_id: themeSetting ? themeSetting.value : 'minimal',
+                        currency: currencySetting ? currencySetting.value : 'TWD',
+                        last_sync_at: new Date().toISOString()
+                    };
+
+                    const { error: settingsError } = await this.supabaseClient
+                        .from('user_settings')
+                        .upsert(settingsData, { onConflict: 'user_id' });
+
+                    if (settingsError) throw settingsError;
+                    console.log('✅ Synced user settings');
+
+                    // 4. 執行雲端資料清理（刪除 365 天前的資料）
+                    const { data: cleanupResult, error: cleanupError } = await this.supabaseClient
+                        .rpc('sync_and_cleanup', { target_user_id: currentUser.id });
+
+                    if (cleanupError) {
+                        console.warn('⚠️ Cleanup failed:', cleanupError);
+                    } else {
+                        console.log(`✅ Cleaned up ${cleanupResult.deleted_count} old records from cloud`);
+                    }
+
+                    // 5. 更新最後同步時間
+                    this.lastSyncTime = new Date();
+                    await this.setLastSyncTime(this.lastSyncTime);
+
+                    this.isSyncing = false;
+                    updateSyncUI();
+
+                    return { success: true, time: this.lastSyncTime };
+
+                } catch (error) {
+                    console.error('❌ Sync failed:', error);
+                    this.syncError = error.message;
+                    this.isSyncing = false;
+                    updateSyncUI();
+
+                    // 靜默處理錯誤，不影響使用者體驗
+                    return { success: false, error: error.message };
+                }
+            }
+
+            async syncFromCloud() {
+                if (!this.supabaseClient || !currentUser) {
+                    return { success: false, error: 'offline' };
+                }
+
+                try {
+                    console.log('🔄 Pulling data from cloud...');
+
+                    // 1. 拉取交易记录（仅最近 365 天）
+                    const { data: transactions, error: txError } = await this.supabaseClient
+                        .from('transactions')
+                        .select('*')
+                        .eq('user_id', currentUser.id)
+                        .gte('date', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+                        .order('date', { ascending: false });
+
+                    if (txError) throw txError;
+
+                    // 2. 拉取分类
+                    const { data: categories, error: catError } = await this.supabaseClient
+                        .from('categories')
+                        .select('*')
+                        .eq('user_id', currentUser.id);
+
+                    if (catError) throw catError;
+
+                    // 3. 拉取使用者設定
+                    const { data: settings, error: settingsError } = await this.supabaseClient
+                        .from('user_settings')
+                        .select('*')
+                        .eq('user_id', currentUser.id)
+                        .single();
+
+                    if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
+
+                    // 4. 儲存到本地（不覆蓋本地更新的資料）
+                    if (transactions && transactions.length > 0) {
+                        for (const tx of transactions) {
+                            const local = await this.localDB.get('transactions', tx.id);
+                            if (!local || new Date(tx.updated_at) > new Date(local.updated_at)) {
+                                await this.localDB.put('transactions', {
+                                    id: tx.id,
+                                    amount: parseFloat(tx.amount),
+                                    date: tx.date,
+                                    note: tx.note,
+                                    category: tx.category,
+                                    icon: tx.icon,
+                                    currency: tx.currency,
+                                    updated_at: tx.updated_at
+                                });
+                            }
+                        }
+                        console.log(`✅ Pulled ${transactions.length} transactions from cloud`);
+                    }
+
+                    if (categories && categories.length > 0) {
+                        for (const cat of categories) {
+                            await this.localDB.put('categories', {
+                                id: cat.id,
+                                name: cat.name,
+                                icon: cat.icon,
+                                color: cat.color,
+                                updated_at: cat.updated_at
+                            });
+                        }
+                        console.log(`✅ Pulled ${categories.length} categories from cloud`);
+                    }
+
+                    if (settings) {
+                        await this.localDB.put('settings', { key: 'budget', value: parseFloat(settings.budget) });
+                        await this.localDB.put('settings', { key: 'themeId', value: settings.theme_id });
+                        await this.localDB.put('settings', { key: 'currency', value: settings.currency });
+                        console.log('✅ Pulled user settings from cloud');
+                    }
+
+                    return { success: true };
+
+                } catch (error) {
+                    console.error('❌ Pull failed:', error);
+                    return { success: false, error: error.message };
+                }
+            }
+        }
+
+        // 初始化同步管理器
+        let syncManager = null;
+
+        // ============================================
+        // Emoji Pool
+        // ============================================
         const EMOJI_POOL = [
-            // 食物飲料
-            "🍚", "🍜", "🍕", "🥩", "🥗", "🍞", "🍳", "🍣", "🍦", "☕", "🍵", "🍺", "🥤", "🍩", "🍔", "🥪", "🍢", "🍲", "🍇", "🍎", "🥝", "🥓", "🍤", "🍿", "🍫", "🍯", "🥛", "🥂", "🥃", "🥢",
-            // 交通與旅行
-            "🚗", "🚕", "🚌", "🚇", "🚲", "🛴", "✈️", "🚢", "🚄", "🚉", "⛽", "🅿️", "🎫", "🏨", "🧳", "🗺️", "⛺", "🚠", "🏍️", "🚚",
-            // 購物與居家
-            "🛒", "🛍️", "👟", "👕", "👗", "👒", "💍", "💄", "👜", "📦", "🎁", "📱", "💻", "📷", "⌚", "🔋", "🏠", "🛋️", "💡", "🛁", "🧹", "🪴", "🪑", "🔑", "🏠", "🧺", "🪒", "🧴",
-            // 娛樂與嗜好
-            "🎮", "🎬", "🎤", "🎧", "🎨", "🎭", "🎻", "🎸", "🎲", "🎳", "⛳", "🏀", "⚽", "🎾", "🏋️", "🧘", "🚵", "🏊", "🏐", "🪁", "🏰", "🎡", "🎢", "🎟️", "🎰", "🕹️",
-            // 醫療、保險與教育
-            "💊", "🏥", "💉", "🩸", "🩺", "🦷", "👓", "🩹", "🩹", "📜", "📚", "🖊️", "🎓", "🖋️", "📝", "🏫", "🎒", "🗂️",
-            // 財務與雜項
-            "💰", "💳", "🧾", "🏦", "💹", "📈", "📉", "💎", "🧧", "📮", "💸", "🪙", "⚖️", "🚬", "🔋", "💡", "🚿", "🚻", "🚮", "📶", "🔌",
-            // 人物與寵物
-            "🐶", "🐱", "🐰", "🐹", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐒", "🐔", "🦄", "🐾", "👶", "👧", "👦", "👴", "👵", "💇", "💅", "🧖", "💐"
+            // 餐飲美食 (25個)
+            "🍚", "🍜", "🍝", "🍕", "🍔", "🍟", "🌭", "🥪", "🌮", "🌯", "🍱", "🍛", "🍲", "🍳", "🥘", "🍗", "🍖", "🥩", "🍤", "🍣", "🍰", "🧁", "🍩", "🎂", "🥓",
+            // 飲品茶飲 (15個)
+            "☕", "🍵", "🧋", "🥤", "🥛", "🍷", "🍺", "🥂", "🍹", "🧊", "🍻", "🥃", "🧉", "🧃", "🍾",
+            // 交通出行 (18個)
+            "🚗", "🚕", "🚙", "🚌", "🚇", "🚲", "🛵", "🏍️", "✈️", "🚄", "🚢", "⛽", "🅿️", "🎫", "🚉", "🧳", "🚂", "🚁",
+            // 購物消費 (20個)
+            "🛒", "🛍️", "👕", "👗", "👖", "👟", "👠", "👜", "👛", "🎒", "💄", "💍", "⌚", "👓", "📦", "🎁", "🧥", "👔", "🩱", "🧢",
+            // 娛樂休閒 (20個)
+            "🎮", "🎬", "🎤", "🎧", "🎨", "🎭", "🎸", "🎯", "🎲", "🎳", "🎟️", "🎪", "🎡", "🎢", "🎰", "🎹", "🎺", "🎻", "🎷", "🕹️",
+            // 社交聚會 (12個)
+            "🍻", "🥳", "🎉", "🎊", "🎈", "🎀", "🧨", "🎆", "🎇", "🍾", "🥂", "💐",
+            // 運動健身 (12個)
+            "⚽", "🏀", "🎾", "🏐", "🏋️", "🧘", "🚴", "🏃", "🏊", "⛹️", "🥊", "🤸",
+            // 金融理財 (15個)
+            "💰", "💳", "💵", "💴", "💶", "💷", "🏦", "💹", "📈", "🪙", "💸", "💲", "🤑", "📊", "📉",
+            // 帳單費用 (18個)
+            "🧾", "📱", "💻", "📞", "📺", "🔌", "💡", "🔋", "📶", "🚿", "🚽", "🛁", "🧻", "🧼", "🧽", "🧴", "🗑️", "📮",
+            // 保險稅務 (8個)
+            "🏛️", "⚖️", "📋", "📑", "🗂️", "📇", "🔖", "💼",
+            // 房租住宅 (10個)
+            "🏠", "🏡", "🏢", "🏬", "🏨", "🏩", "🛏️", "🛋️", "🚪", "🔑",
+            // 醫療保健 (10個)
+            "💊", "💉", "🏥", "🩺", "🦷", "🩹", "🧬", "🧪", "⚕️", "🧑‍⚕️",
+            // 教育學習 (8個)
+            "📚", "📖", "📝", "✏️", "🖊️", "🎓", "🏫", "🖍️",
+            // 寵物照顧 (8個)
+            "🐶", "🐱", "🐰", "🐹", "🐾", "🦴", "🐟", "🐦",
+            // 嗜好習慣 (6個)
+            "🚬", "🎰", "🎲", "🃏", "🀄", "🧩"
         ];
 
         let state = {
-            budget: parseFloat(localStorage.getItem('ledger_budget_v13')) || 30000,
-            themeId: localStorage.getItem('ledger_theme_id_v13') || 'minimal',
-            transactions: JSON.parse(localStorage.getItem('ledger_tx_v13')) || [],
-            categories: JSON.parse(localStorage.getItem('ledger_cats_v13')) || [
+            budget: 30000,
+            themeId: 'minimal',
+            currency: 'TWD',
+            transactions: [],
+            categories: [
                 { name: "美食餐飲", icon: "🍚", color: "#6366f1" },
                 { name: "交通運輸", icon: "🚗", color: "#10b981" },
                 { name: "購物消費", icon: "🛒", color: "#f59e0b" },
@@ -422,20 +1593,454 @@
             ],
             editingId: null,
             tempCat: "美食餐飲",
-            tempEmoji: null
+            tempCurrency: null,
+            tempEmoji: null,
+            isOnline: navigator.onLine,
+            lastSyncTime: null,
+            syncError: null
         };
+
+        // ============================================
+        // 資料載入和儲存（本地優先）
+        // ============================================
+
+        // 從 IndexedDB 載入資料到 state
+        async function loadDataFromLocal() {
+            try {
+                console.log('📂 Loading data from IndexedDB...');
+
+                // 加载交易记录
+                const transactions = await localDB.getAll('transactions');
+                state.transactions = transactions.sort((a, b) => b.date.localeCompare(a.date));
+
+                // 加载分类
+                const categories = await localDB.getAll('categories');
+                if (categories.length > 0) {
+                    state.categories = categories;
+                }
+
+                // 載入設定
+                const budgetSetting = await localDB.get('settings', 'budget');
+                const themeSetting = await localDB.get('settings', 'themeId');
+                const currencySetting = await localDB.get('settings', 'currency');
+
+                if (budgetSetting) state.budget = budgetSetting.value;
+                if (themeSetting) state.themeId = themeSetting.value;
+                if (currencySetting) state.currency = currencySetting.value;
+
+                // 加载同步元数据
+                const lastSync = await localDB.get('sync_metadata', 'lastSyncTime');
+                if (lastSync) state.lastSyncTime = new Date(lastSync.value);
+
+                console.log(`✅ Loaded ${state.transactions.length} transactions, ${state.categories.length} categories`);
+                
+                // 迁移旧的 localStorage 数据（仅首次）
+                await migrateFromLocalStorage();
+
+            } catch (error) {
+                console.error('❌ Failed to load from IndexedDB:', error);
+                // 回退到 localStorage
+                loadDataFromLocalStorage();
+            }
+        }
+
+        // 迁移旧的 localStorage 数据到 IndexedDB（仅首次运行）
+        async function migrateFromLocalStorage() {
+            const migrated = await localDB.get('sync_metadata', 'localStorage_migrated');
+            if (migrated) return; // 已迁移过
+
+            console.log('🔄 Migrating data from localStorage to IndexedDB...');
+
+            try {
+                // 迁移交易记录
+                const oldTx = JSON.parse(localStorage.getItem('ledger_tx_v13') || '[]');
+                if (oldTx.length > 0) {
+                    for (const tx of oldTx) {
+                        tx.updated_at = tx.updated_at || new Date().toISOString();
+                        await localDB.put('transactions', tx);
+                    }
+                    state.transactions = oldTx.sort((a, b) => b.date.localeCompare(a.date));
+                    console.log(`✅ Migrated ${oldTx.length} transactions`);
+                }
+
+                // 迁移分类
+                const oldCats = JSON.parse(localStorage.getItem('ledger_cats_v13') || '[]');
+                if (oldCats.length > 0) {
+                    for (const cat of oldCats) {
+                        cat.id = cat.id || crypto.randomUUID();
+                        cat.updated_at = cat.updated_at || new Date().toISOString();
+                        await localDB.put('categories', cat);
+                    }
+                    state.categories = oldCats;
+                    console.log(`✅ Migrated ${oldCats.length} categories`);
+                }
+
+                // 迁移设置
+                const oldBudget = parseFloat(localStorage.getItem('ledger_budget_v13'));
+                const oldTheme = localStorage.getItem('ledger_theme_id_v13');
+                const oldCurrency = localStorage.getItem('ledger_currency_v13');
+
+                if (oldBudget) {
+                    await localDB.put('settings', { key: 'budget', value: oldBudget });
+                    state.budget = oldBudget;
+                }
+                if (oldTheme) {
+                    await localDB.put('settings', { key: 'themeId', value: oldTheme });
+                    state.themeId = oldTheme;
+                }
+                if (oldCurrency) {
+                    await localDB.put('settings', { key: 'currency', value: oldCurrency });
+                    state.currency = oldCurrency;
+                }
+
+                // 标记为已迁移
+                await localDB.put('sync_metadata', { key: 'localStorage_migrated', value: true });
+                console.log('✅ Migration completed');
+
+                // 可选：清理旧数据
+                // localStorage.removeItem('ledger_tx_v13');
+                // localStorage.removeItem('ledger_cats_v13');
+                // localStorage.removeItem('ledger_budget_v13');
+                // localStorage.removeItem('ledger_theme_id_v13');
+                // localStorage.removeItem('ledger_currency_v13');
+
+            } catch (error) {
+                console.error('❌ Migration failed:', error);
+            }
+        }
+
+        // 回退到 localStorage（仅当 IndexedDB 失败时）
+        function loadDataFromLocalStorage() {
+            console.warn('⚠️ Falling back to localStorage');
+            state.budget = parseFloat(localStorage.getItem('ledger_budget_v13')) || 30000;
+            state.themeId = localStorage.getItem('ledger_theme_id_v13') || 'minimal';
+            state.currency = localStorage.getItem('ledger_currency_v13') || 'TWD';
+            state.transactions = JSON.parse(localStorage.getItem('ledger_tx_v13')) || [];
+            state.categories = JSON.parse(localStorage.getItem('ledger_cats_v13')) || state.categories;
+        }
+
+        // 保存数据到 IndexedDB（本地优先）
+        async function save() {
+            try {
+                // 保存到 IndexedDB
+                await localDB.put('settings', { key: 'budget', value: state.budget });
+                await localDB.put('settings', { key: 'themeId', value: state.themeId });
+                await localDB.put('settings', { key: 'currency', value: state.currency });
+
+                // 同时保存到 localStorage 作为备份
+                localStorage.setItem('ledger_budget_v13', state.budget);
+                localStorage.setItem('ledger_theme_id_v13', state.themeId);
+                localStorage.setItem('ledger_currency_v13', state.currency);
+
+            } catch (error) {
+                console.error('❌ Save failed:', error);
+                // 回退到 localStorage
+                localStorage.setItem('ledger_budget_v13', state.budget);
+                localStorage.setItem('ledger_theme_id_v13', state.themeId);
+                localStorage.setItem('ledger_currency_v13', state.currency);
+            }
+        }
 
         let lastPage = 'home';
         let myChart = null;
 
-        window.onload = () => {
-            applyTheme(state.themeId);
-            lucide.createIcons();
-            updateHUDDate();
-            const currentMonth = new Date().toISOString().slice(0, 7);
-            document.getElementById('statsMonth').value = currentMonth;
-            document.getElementById('histMonth').value = currentMonth;
-            renderAll();
+        function getCurrencySymbol() {
+            const curr = CURRENCY_OPTIONS.find(c => c.id === state.currency);
+            return curr ? curr.symbol : 'NT$';
+        }
+
+        function updateCurrencySymbols() {
+            const symbol = getCurrencySymbol();
+            const el1 = document.getElementById('currencySymbolHome');
+            const el2 = document.getElementById('currencySymbolHome2');
+            const el3 = document.getElementById('currencySymbolAdd');
+            if(el1) el1.innerText = symbol;
+            if(el2) el2.innerText = symbol;
+            if(el3) el3.innerText = symbol;
+        }
+
+        // ============================================
+        // 同步 UI 更新函数
+        // ============================================
+        function updateSyncUI() {
+            if (!syncManager) return;
+
+            const statusBadge = document.getElementById('syncStatusBadge');
+            const lastSyncDisplay = document.getElementById('lastSyncDisplay');
+            const syncErrorMessage = document.getElementById('syncErrorMessage');
+            const syncBtnText = document.getElementById('syncBtnText');
+            const manualSyncBtn = document.getElementById('manualSyncBtn');
+            const localDataCount = document.getElementById('localDataCount');
+
+            // 更新本地資料統計
+            if (localDataCount) {
+                localDataCount.innerText = `${state.transactions.length} 筆交易`;
+            }
+
+            // 更新同步状态徽章
+            if (statusBadge) {
+                if (!supabaseClient) {
+                    statusBadge.innerHTML = '<span class="bg-gray-500/20 text-gray-400 px-2 py-1 rounded-full">仅本地</span>';
+                } else if (!currentUser) {
+                    statusBadge.innerHTML = '<span class="bg-orange-500/20 text-orange-400 px-2 py-1 rounded-full">需要登录</span>';
+                } else if (syncManager.isSyncing) {
+                    statusBadge.innerHTML = '<span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full">同步中...</span>';
+                } else if (syncManager.syncError) {
+                    statusBadge.innerHTML = '<span class="bg-red-500/20 text-red-400 px-2 py-1 rounded-full">同步失败</span>';
+                } else if (syncManager.lastSyncTime) {
+                    statusBadge.innerHTML = '<span class="bg-green-500/20 text-green-400 px-2 py-1 rounded-full">已同步</span>';
+                } else {
+                    statusBadge.innerHTML = '<span class="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">未同步</span>';
+                }
+            }
+
+            // 更新最后同步时间
+            if (lastSyncDisplay) {
+                if (syncManager.lastSyncTime) {
+                    const timeDiff = Date.now() - syncManager.lastSyncTime.getTime();
+                    const minutes = Math.floor(timeDiff / 60000);
+                    const hours = Math.floor(minutes / 60);
+                    const days = Math.floor(hours / 24);
+
+                    if (days > 0) {
+                        lastSyncDisplay.innerText = `${days} 天前`;
+                    } else if (hours > 0) {
+                        lastSyncDisplay.innerText = `${hours} 小时前`;
+                    } else if (minutes > 0) {
+                        lastSyncDisplay.innerText = `${minutes} 分钟前`;
+                    } else {
+                        lastSyncDisplay.innerText = '刚刚';
+                    }
+                } else {
+                    lastSyncDisplay.innerText = '從未同步';
+                }
+            }
+
+            // 更新錯誤資訊
+            if (syncErrorMessage) {
+                if (!supabaseClient) {
+                    syncErrorMessage.innerText = '⚠️ 未配置雲端，目前僅儲存於本地';
+                    syncErrorMessage.classList.remove('hidden');
+                } else if (!currentUser) {
+                    syncErrorMessage.innerText = '💡 提示：請先登入 Supabase 帳戶才能啟用雲端同步功能';
+                    syncErrorMessage.className = 'text-[9px] text-orange-400 bg-orange-500/10 p-2 rounded-lg';
+                    syncErrorMessage.classList.remove('hidden');
+                } else if (syncManager.syncError) {
+                    if (syncManager.syncError === 'offline') {
+                        syncErrorMessage.innerText = '⚠️ 網路離線，目前僅儲存於本地';
+                    } else {
+                        syncErrorMessage.innerText = `❌ 同步失敗：${syncManager.syncError}`;
+                    }
+                    syncErrorMessage.className = 'text-[9px] text-red-400 bg-red-500/10 p-2 rounded-lg';
+                    syncErrorMessage.classList.remove('hidden');
+                } else {
+                    syncErrorMessage.classList.add('hidden');
+                }
+            }
+
+            // 更新按鈕狀態
+            if (syncBtnText && manualSyncBtn) {
+                if (syncManager.isSyncing) {
+                    syncBtnText.innerText = '🔄 同步中...';
+                    manualSyncBtn.disabled = true;
+                    manualSyncBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                } else if (!supabaseClient) {
+                    syncBtnText.innerText = '☁️ 未配置雲端';
+                    manualSyncBtn.disabled = true;
+                    manualSyncBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                } else if (!currentUser) {
+                    syncBtnText.innerText = '🔐 需要登入才能同步';
+                    manualSyncBtn.disabled = true;
+                    manualSyncBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    syncBtnText.innerText = '🔄 立即同步到雲端';
+                    manualSyncBtn.disabled = false;
+                    manualSyncBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
+        }
+
+        // 手动同步按钮
+        async function manualSync() {
+            if (!syncManager || syncManager.isSyncing) return;
+
+            updateSyncUI();
+            const result = await syncManager.syncToCloud();
+
+            if (result.success) {
+                console.log('✅ Manual sync completed');
+                // 可选：显示成功提示
+            } else {
+                console.warn('⚠️ Manual sync failed:', result.error);
+            }
+
+            updateSyncUI();
+        }
+
+        // 检查网络状态
+        window.addEventListener('online', () => {
+            console.log('🌐 Network online');
+            state.isOnline = true;
+            updateSyncUI();
+            // 自動同步
+            if (syncManager) {
+                syncManager.syncToCloud().catch(err => console.warn('Auto sync failed:', err));
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            console.log('📡 Network offline');
+            state.isOnline = false;
+            updateSyncUI();
+        });
+
+        // ============================================
+        // 应用初始化
+        // ============================================
+        window.onload = async () => {
+            console.log('🚀 Initializing Ledger App...');
+
+            try {
+                // 1. 初始化 IndexedDB
+                await localDB.init();
+
+                // 2. 加载本地数据
+                await loadDataFromLocal();
+
+                // 3. 初始化 Supabase 并处理 Magic Link
+                if (supabaseClient) {
+                    // 设置 auth 状态变化监听器
+                    supabaseClient.auth.onAuthStateChange(async (event, session) => {
+                        console.log('🔐 Auth state changed:', event);
+                        
+                        if (event === 'SIGNED_IN' && session) {
+                            currentUser = session.user;
+                            state.isLoggedIn = true;
+                            state.userId = currentUser.id;
+                            console.log('✅ User signed in:', currentUser.email);
+                            
+                            // 清除 URL 中的 hash
+                            if (window.location.hash) {
+                                window.history.replaceState(null, '', window.location.pathname);
+                            }
+                            
+                            // 顯示主應用并同步数据
+                            showMainApp();
+                            
+                            // 初始化同步管理器（如果还没有）
+                            if (!syncManager) {
+                                syncManager = new SyncManager(localDB, supabaseClient);
+                            }
+                            
+                            // 自動同步
+                            console.log('🔄 Starting initial sync...');
+                            await syncManager.syncFromCloud();
+                            await loadDataFromLocal(); // 重新加载合并后的数据
+                            await syncManager.syncToCloud();
+                            
+                            // 刷新UI
+                            renderAll();
+                            updateAuthUI();
+                            
+                            console.log('✅ Login and sync completed!');
+                        } else if (event === 'SIGNED_OUT') {
+                            currentUser = null;
+                            state.isLoggedIn = false;
+                            state.userId = null;
+                            console.log('⚠️ User signed out');
+                            updateAuthUI();
+                        }
+                    });
+
+                    // 先检查 URL 中是否有 Magic Link 的 token（hash fragment）
+                    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                    const hasAuthToken = hashParams.has('access_token') || hashParams.has('error');
+                    
+                    if (hasAuthToken) {
+                        console.log('🔗 Detected Magic Link callback in URL');
+                        // Supabase SDK 会自动处理这个 hash，我们只需要等待
+                        // 不要立即检查 session，让 SDK 先完成处理
+                    }
+
+                    // 检查现有会话
+                    const { data: { session } } = await supabaseClient.auth.getSession();
+                    if (session) {
+                        currentUser = session.user;
+                        state.isLoggedIn = true;
+                        state.userId = currentUser.id;
+                        console.log('✅ Existing session found:', currentUser.email);
+                    } else {
+                        console.log('⚠️ No user session found');
+                        state.isLoggedIn = false;
+                        state.userId = null;
+                    }
+
+                    // 初始化同步管理器
+                    syncManager = new SyncManager(localDB, supabaseClient);
+                    
+                    // 获取最后同步时间
+                    syncManager.lastSyncTime = await syncManager.getLastSyncTime();
+
+                    // 自動同步（如果已登入）
+                    if (state.isLoggedIn && currentUser) {
+                        console.log('🔄 Auto-syncing...');
+                        await syncManager.syncFromCloud();
+                        await loadDataFromLocal(); // 重新加载合并后的数据
+                        await syncManager.syncToCloud(); // 同步本地新数据到云端
+                    }
+                } else {
+                    console.log('ℹ️ Running in local-only mode (Supabase not configured)');
+                    syncManager = new SyncManager(localDB, null);
+                    state.isLoggedIn = false;
+                    state.userId = null;
+                }
+
+                // 4. 应用主题
+                applyTheme(state.themeId);
+
+                // 5. 初始化 UI
+                lucide.createIcons();
+                updateHUDDate();
+                updateCurrencySymbols();
+                const currentMonth = new Date().toISOString().slice(0, 7);
+                document.getElementById('statsMonth').value = currentMonth;
+                document.getElementById('histMonth').value = currentMonth;
+
+                // 6. 决定显示哪个页面
+                if (!state.isLoggedIn && supabaseClient) {
+                    // 如果 Supabase 已配置但用户未登录，显示登录页面
+                    const hasLocalData = state.transactions.length > 0 || state.categories.length > 5;
+                    if (!hasLocalData) {
+                        // 新用户，显示登录页面
+                        showAuthPage();
+                    } else {
+                        // 有本地数据的用户，直接进入主应用（允许本地使用）
+                        showMainApp();
+                    }
+                } else {
+                    // 已登入或本地模式，顯示主應用
+                    showMainApp();
+                }
+
+                // 7. 更新同步 UI
+                updateSyncUI();
+
+                console.log('✅ App initialized successfully');
+
+            } catch (error) {
+                console.error('❌ App initialization failed:', error);
+                
+                // 回退到纯 localStorage 模式
+                loadDataFromLocalStorage();
+                applyTheme(state.themeId);
+                lucide.createIcons();
+                updateHUDDate();
+                updateCurrencySymbols();
+                const currentMonth = new Date().toISOString().slice(0, 7);
+                document.getElementById('statsMonth').value = currentMonth;
+                document.getElementById('histMonth').value = currentMonth;
+                renderAll();
+            }
         };
 
         function applyTheme(themeId) {
@@ -454,12 +2059,154 @@
             localStorage.setItem('ledger_budget_v13', state.budget);
             localStorage.setItem('ledger_cats_v13', JSON.stringify(state.categories));
             localStorage.setItem('ledger_theme_id_v13', state.themeId);
+            localStorage.setItem('ledger_currency_v13', state.currency);
         }
 
         function updateHUDDate() {
             const d = new Date();
             document.getElementById('hudDate').innerText = d.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric', year: 'numeric' });
         }
+
+        // ============================================
+        // Authentication Functions
+        // ============================================
+
+        function switchAuthTab(tab) {
+            const signInForm = document.getElementById('formSignIn');
+            const signUpForm = document.getElementById('formSignUp');
+            const signInTab = document.getElementById('tabSignIn');
+            const signUpTab = document.getElementById('tabSignUp');
+            
+            if (tab === 'signin') {
+                signInForm.classList.remove('hidden');
+                signUpForm.classList.add('hidden');
+                signInTab.className = 'auth-tab-active flex-1 py-3 rounded-[24px] text-sm font-black transition-all';
+                signUpTab.className = 'auth-tab-inactive flex-1 py-3 rounded-[24px] text-sm font-black transition-all';
+            } else {
+                signInForm.classList.add('hidden');
+                signUpForm.classList.remove('hidden');
+                signInTab.className = 'auth-tab-inactive flex-1 py-3 rounded-[24px] text-sm font-black transition-all';
+                signUpTab.className = 'auth-tab-active flex-1 py-3 rounded-[24px] text-sm font-black transition-all';
+            }
+        }
+
+        async function handleMagicLink(type) {
+            if (!supabaseClient) {
+                showAuthMessage('⚠️ Supabase 未配置，無法使用雲端功能', 'error');
+                return;
+            }
+
+            const email = type === 'signin' ? 
+                document.getElementById('emailSignIn').value.trim() : 
+                document.getElementById('emailSignUp').value.trim();
+
+            if (!email || !email.includes('@')) {
+                showAuthMessage('❌ 請輸入有效的 Email 地址', 'error');
+                return;
+            }
+
+            const btnText = type === 'signin' ? document.getElementById('btnSignInText') : document.getElementById('btnSignUpText');
+            const originalText = btnText.innerText;
+            btnText.innerText = '🔄 發送中...';
+
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithOtp({
+                    email: email,
+                    options: {
+                        emailRedirectTo: window.location.href
+                    }
+                });
+
+                if (error) throw error;
+
+                showAuthMessage(`✅ 登入連結已發送至 ${email}<br>請檢查您的信箱並點擊連結完成登入`, 'success');
+                
+                // Clear email input
+                if (type === 'signin') {
+                    document.getElementById('emailSignIn').value = '';
+                } else {
+                    document.getElementById('emailSignUp').value = '';
+                }
+
+            } catch (error) {
+                console.error('Magic link error:', error);
+                showAuthMessage(`❌ 發送失敗：${error.message}`, 'error');
+            } finally {
+                btnText.innerText = originalText;
+            }
+        }
+
+        function showAuthMessage(message, type = 'info') {
+            const msgContainer = document.getElementById('authMessage');
+            const msgText = document.getElementById('authMessageText');
+            
+            msgText.innerHTML = message;
+            msgContainer.classList.remove('hidden');
+            
+            if (type === 'success') {
+                msgContainer.className = 'glass-panel p-6 rounded-[24px] text-center border border-green-500/20 bg-green-500/5';
+            } else if (type === 'error') {
+                msgContainer.className = 'glass-panel p-6 rounded-[24px] text-center border border-red-500/20 bg-red-500/5';
+            } else {
+                msgContainer.className = 'glass-panel p-6 rounded-[24px] text-center';
+            }
+            
+            // Auto hide after 5 seconds
+            setTimeout(() => {
+                msgContainer.classList.add('hidden');
+            }, 5000);
+        }
+
+        function skipLogin() {
+            console.log('⚠️ User skipped login - using local mode only');
+            state.isLoggedIn = false;
+            state.userId = null;
+            showMainApp();
+        }
+
+        async function handleSignOut() {
+            if (!supabaseClient) return;
+            
+            try {
+                const { error } = await supabaseClient.auth.signOut();
+                if (error) throw error;
+                
+                console.log('✅ Signed out successfully');
+                state.isLoggedIn = false;
+                state.userId = null;
+                currentUser = null;
+                
+                // Show auth page
+                showAuthPage();
+                
+            } catch (error) {
+                console.error('❌ Sign out error:', error);
+                alert('登出失敗：' + error.message);
+            }
+        }
+
+        function showAuthPage() {
+            document.getElementById('page-auth').classList.remove('hidden-page');
+            document.getElementById('page-home').classList.add('hidden-page');
+            document.getElementById('page-history').classList.add('hidden-page');
+            document.getElementById('page-stats').classList.add('hidden-page');
+            document.getElementById('page-settings').classList.add('hidden-page');
+            document.getElementById('page-add').classList.add('hidden-page');
+            document.getElementById('header-ui').classList.add('hidden');
+            document.getElementById('nav-container').classList.add('hidden');
+            lucide.createIcons();
+        }
+
+        function showMainApp() {
+            document.getElementById('page-auth').classList.add('hidden-page');
+            document.getElementById('header-ui').classList.remove('hidden');
+            document.getElementById('nav-container').classList.remove('hidden');
+            nav('home');
+        }
+
+        // ============================================
+        // Navigation
+        // ============================================
 
         function nav(pageId) {
             const sections = ['home', 'history', 'stats', 'settings', 'add'];
@@ -490,25 +2237,80 @@
             const now = new Date();
             const currentMonthStr = now.toISOString().slice(0, 7);
             const monthFiltered = state.transactions.filter(t => t.date.startsWith(currentMonthStr));
-            const totalSpent = monthFiltered.reduce((acc, curr) => acc + curr.amount, 0);
+            
+            // 将所有交易转换为预设币种后计算总支出
+            const totalSpent = monthFiltered.reduce((acc, curr) => {
+                const txCurrency = curr.currency || state.currency; // 相容舊資料
+                const convertedAmount = convertCurrency(curr.amount, txCurrency, state.currency);
+                return acc + convertedAmount;
+            }, 0);
             
             const remaining = Math.max(0, state.budget - totalSpent);
             const percent = state.budget > 0 ? (remaining / state.budget) * 100 : 0;
             
-            document.getElementById('displaySpent').innerText = `$${totalSpent.toLocaleString()}`;
-            document.getElementById('displayBudgetLimit').innerText = `$${state.budget.toLocaleString()}`;
+            const symbol = getCurrencySymbol();
+            // 显示剩余预算（大字）
+            document.getElementById('displayRemaining').innerHTML = `${symbol}${Math.round(remaining).toLocaleString()}`;
+            // 显示已花费
+            document.getElementById('displaySpent').innerHTML = `${symbol}${Math.round(totalSpent).toLocaleString()}`;
+            // 显示总预算
+            document.getElementById('displayBudgetLimit').innerHTML = `${symbol}${state.budget.toLocaleString()}`;
             
             const liquidEl = document.getElementById('liquidLevel');
             liquidEl.style.height = percent + '%';
             
+            // 根據預算狀態動態改變液體顏色和狀態文字
+            let colorDark, colorMid, colorLight, statusText, statusColor;
+            if(percent > 60) {
+                // 健康狀態 - 綠色
+                colorDark = '#059669';
+                colorMid = '#10b981';
+                colorLight = '#34d399';
+                statusText = "Status: Healthy";
+                statusColor = '#10b981';
+            } else if(percent > 40) {
+                // OK 狀態 - 藍綠色
+                colorDark = '#0891b2';
+                colorMid = '#06b6d4';
+                colorLight = '#22d3ee';
+                statusText = "Status: OK";
+                statusColor = '#06b6d4';
+            } else if(percent > 20) {
+                // 警告狀態 - 橙色
+                colorDark = '#c2410c';
+                colorMid = '#ea580c';
+                colorLight = '#fb923c';
+                statusText = "Status: Warning";
+                statusColor = '#ea580c';
+            } else if(percent > 0) {
+                // 危險狀態 - 紅色
+                colorDark = '#b91c1c';
+                colorMid = '#dc2626';
+                colorLight = '#f87171';
+                statusText = "Status: Warning";
+                statusColor = '#dc2626';
+            } else {
+                // 耗盡狀態 - 深紅色
+                colorDark = '#7f1d1d';
+                colorMid = '#991b1b';
+                colorLight = '#b91c1c';
+                statusText = "Status: Depleted";
+                statusColor = '#991b1b';
+            }
+            
+            document.documentElement.style.setProperty('--liquid-color-dark', colorDark);
+            document.documentElement.style.setProperty('--liquid-color-mid', colorMid);
+            document.documentElement.style.setProperty('--liquid-color-light', colorLight);
+            
             const msgEl = document.getElementById('budgetMessage');
-            if(percent > 50) msgEl.innerText = "Status: Healthy";
-            else if(percent > 10) msgEl.innerText = "Status: Warning";
-            else if(percent > 0) msgEl.innerText = "Status: Critical";
-            else msgEl.innerText = "Status: Depleted";
+            msgEl.innerText = statusText;
+            msgEl.style.color = statusColor;
 
             const recent = state.transactions.slice(0, 5);
-            document.getElementById('recentList').innerHTML = recent.length ? recent.map(t => `
+            document.getElementById('recentList').innerHTML = recent.length ? recent.map(t => {
+                const txCurrency = t.currency || state.currency;
+                const txSymbol = CURRENCY_OPTIONS.find(c => c.id === txCurrency)?.symbol || symbol;
+                return `
                 <div onclick="editTx(${t.id})" class="glass-panel p-4 flex justify-between items-center rounded-2xl active:scale-95 transition-transform cursor-pointer">
                     <div class="flex items-center gap-3">
                         <span class="text-xl">${t.icon}</span>
@@ -517,12 +2319,14 @@
                             <div class="text-[8px] font-black text-white/20 uppercase">${t.date}</div>
                         </div>
                     </div>
-                    <div class="text-xs font-black">-$${t.amount.toLocaleString()}</div>
+                    <div class="text-xs font-black">-${txSymbol}${t.amount.toLocaleString()}</div>
                 </div>
-            `).join('') : '<div class="text-center py-4 text-white/10 text-xs uppercase tracking-widest">No activities</div>';
+                `;
+            }).join('') : '<div class="text-center py-4 text-white/10 text-xs uppercase tracking-widest">No activities</div>';
         }
 
         function renderHistory(filterCategory = null) {
+            const symbol = getCurrencySymbol();
             const month = document.getElementById('histMonth').value;
             let filtered = state.transactions.filter(t => t.date.startsWith(month));
             if(filterCategory) filtered = filtered.filter(t => t.category === filterCategory);
@@ -530,7 +2334,10 @@
             const groups = {};
             filtered.forEach(t => {
                 if(!groups[t.date]) groups[t.date] = { total: 0, items: [] };
-                groups[t.date].total += t.amount;
+                // 转换为预设币种累计
+                const txCurrency = t.currency || state.currency;
+                const convertedAmount = convertCurrency(t.amount, txCurrency, state.currency);
+                groups[t.date].total += convertedAmount;
                 groups[t.date].items.push(t);
             });
 
@@ -558,15 +2365,19 @@
                                 </div>
                                 <div><div class="text-[10px] font-black text-white/40 uppercase tracking-tighter">${date}</div><div class="text-xs font-bold text-white/80">${dayData.items.length} 筆</div></div>
                             </div>
-                            <div class="flex items-center gap-3"><span class="text-sm font-black text-white">$${dayData.total.toLocaleString()}</span><i data-lucide="chevron-down" class="chevron-icon w-4 h-4 text-white/20 transition-transform"></i></div>
+                            <div class="flex items-center gap-3"><span class="text-sm font-black text-white">${symbol}${Math.round(dayData.total).toLocaleString()}</span><i data-lucide="chevron-down" class="chevron-icon w-4 h-4 text-white/20 transition-transform"></i></div>
                         </div>
                         <div class="day-items-container space-y-2">
-                            ${dayData.items.map(t => `
+                            ${dayData.items.map(t => {
+                                const txCurrency = t.currency || state.currency;
+                                const txSymbol = CURRENCY_OPTIONS.find(c => c.id === txCurrency)?.symbol || symbol;
+                                return `
                                 <div onclick="event.stopPropagation(); editTx(${t.id})" class="history-item-row flex justify-between items-center p-3 bg-white/[0.03] rounded-xl cursor-pointer">
                                     <div class="flex items-center gap-3"><span class="text-base">${t.icon}</span><span class="text-[11px] font-bold text-white/70">${t.note || t.category}</span></div>
-                                    <span class="text-xs font-bold text-white">-$${t.amount.toLocaleString()}</span>
+                                    <span class="text-xs font-bold text-white">-${txSymbol}${t.amount.toLocaleString()}</span>
                                 </div>
-                            `).join('')}
+                                `;
+                            }).join('')}
                         </div>
                     </div>
                 `;
@@ -581,8 +2392,11 @@
             const dataMap = {};
             let total = 0;
             state.transactions.filter(t => t.date.startsWith(month)).forEach(t => {
-                dataMap[t.category] = (dataMap[t.category] || 0) + t.amount;
-                total += t.amount;
+                // 转换为预设币种后统计
+                const txCurrency = t.currency || state.currency;
+                const convertedAmount = convertCurrency(t.amount, txCurrency, state.currency);
+                dataMap[t.category] = (dataMap[t.category] || 0) + convertedAmount;
+                total += convertedAmount;
             });
             const labels = Object.keys(dataMap);
             const values = Object.values(dataMap);
@@ -599,55 +2413,127 @@
             if(myChart) myChart.destroy();
             myChart = new Chart(ctx, {
                 type: 'doughnut',
-                data: { labels: labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0, borderRadius: 10 }] },
+                data: { 
+                    labels: labels, 
+                    datasets: [{ 
+                        data: values, 
+                        backgroundColor: colors, 
+                        borderWidth: 2,
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        hoverBorderWidth: 3,
+                        hoverBorderColor: 'rgba(255, 255, 255, 0.5)',
+                        borderRadius: 8,
+                        spacing: 2,
+                        hoverOffset: 8
+                    }] 
+                },
                 options: { 
                     responsive: true, 
-                    maintainAspectRatio: false, 
+                    maintainAspectRatio: false,
+                    animation: {
+                        animateRotate: true,
+                        animateScale: true,
+                        duration: 1200,
+                        easing: 'easeInOutCubic'
+                    },
                     plugins: { 
                         legend: { display: false }, 
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0, 0, 0, 0.95)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255, 255, 255, 0.2)',
+                            borderWidth: 1,
+                            padding: 16,
+                            displayColors: true,
+                            boxPadding: 8,
+                            callbacks: {
+                                label: (context) => {
+                                    const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                    return `${context.label}: ${symbol}${context.parsed.toLocaleString()} (${percentage}%)`;
+                                }
+                            }
+                        },
                         datalabels: { 
-                            color: '#fff', 
-                            font: { weight: '800', size: 10 }, 
-                            // 同時標明名稱與百分比
+                            color: '#ffffff',
+                            font: { weight: '900', size: 10, family: 'monospace' },
                             formatter: (v, context) => {
+                                const percentage = ((v/total)*100);
                                 const label = context.chart.data.labels[context.dataIndex];
-                                return `${label}\n${((v/total)*100).toFixed(0)}%`;
+                                // 显示名称和百分比（所有项目都显示）
+                                if(percentage < 5) {
+                                    return `${percentage.toFixed(0)}%`; // 小于5%只显示百分比
+                                }
+                                return `${label}\n${percentage.toFixed(1)}%`;
                             },
                             textAlign: 'center',
-                            anchor: 'center',
-                            align: 'center',
-                            display: (context) => context.dataset.data[context.dataIndex] > total * 0.05 // 只顯示占比大於 5% 的標籤
+                            anchor: 'end',
+                            align: 'start',
+                            offset: 8,
+                            textStrokeColor: 'rgba(0, 0, 0, 0.8)',
+                            textStrokeWidth: 3,
+                            padding: 4
                         } 
                     }, 
-                    cutout: '65%' 
+                    cutout: '55%',
+                    radius: '90%'
                 }
             });
+            const symbol = getCurrencySymbol();
             document.getElementById('statsLegend').innerHTML = Object.entries(dataMap).sort((a,b)=>b[1]-a[1]).map(([name, val]) => {
                 const cat = state.categories.find(c => c.name === name);
                 return `<div class="stats-item-card glass-panel p-4 rounded-2xl flex justify-between items-center" onclick="nav('history'); document.getElementById('histMonth').value='${month}'; renderHistory('${name}')">
                     <div class="flex items-center gap-3"><span>${cat?.icon || '❓'}</span><span class="text-xs font-bold">${name}</span></div>
-                    <span class="text-xs font-black">$${val.toLocaleString()}</span>
+                    <span class="text-xs font-black">${symbol}${Math.round(val).toLocaleString()}</span>
                 </div>`;
             }).join('');
         }
 
         function prepareAdd() {
-            state.editingId = null; state.tempCat = state.categories[0].name;
-            document.getElementById('formAmount').value = ""; document.getElementById('formNote').value = "";
+            state.editingId = null; 
+            state.tempCat = state.categories[0].name;
+            state.tempCurrency = state.currency; // 預設使用使用者設定的幣種
+            document.getElementById('formAmount').value = ""; 
+            document.getElementById('formNote').value = "";
             document.getElementById('formDate').value = new Date().toISOString().slice(0, 10);
             document.getElementById('deleteBtn').classList.add('hidden');
-            renderFormCatGrid(); nav('add');
+            renderFormCurrencyGrid();
+            renderFormCatGrid(); 
+            nav('add');
         }
 
         function editTx(id) {
             const tx = state.transactions.find(t => t.id === id);
             if(!tx) return;
-            state.editingId = id; state.tempCat = tx.category;
+            state.editingId = id; 
+            state.tempCat = tx.category;
+            state.tempCurrency = tx.currency || state.currency; // 相容舊資料
             document.getElementById('formAmount').value = tx.amount;
             document.getElementById('formNote').value = tx.note;
             document.getElementById('formDate').value = tx.date;
             document.getElementById('deleteBtn').classList.remove('hidden');
-            renderFormCatGrid(); nav('add');
+            renderFormCurrencyGrid();
+            renderFormCatGrid(); 
+            nav('add');
+        }
+
+        function renderFormCurrencyGrid() {
+            document.getElementById('formCurrencyGrid').innerHTML = CURRENCY_OPTIONS.map(c => `
+                <button onclick="selectFormCurrency('${c.id}')" class="flex flex-col items-center p-3 rounded-xl transition-all ${state.tempCurrency === c.id ? 'dynamic-accent-bg text-black' : 'bg-white/5 text-white/30'}">
+                    <span class="text-xl mb-1">${c.flag}</span>
+                    <span class="text-[8px] font-black">${c.id}</span>
+                </button>
+            `).join('');
+        }
+
+        function selectFormCurrency(currencyId) {
+            state.tempCurrency = currencyId;
+            const currObj = CURRENCY_OPTIONS.find(c => c.id === currencyId);
+            if(currObj) {
+                document.getElementById('currencySymbolAdd').innerText = currObj.symbol;
+            }
+            renderFormCurrencyGrid();
         }
 
         function renderFormCatGrid() {
@@ -658,30 +2544,161 @@
             `).join('');
         }
 
-        function saveTransaction() {
+        async function saveTransaction() {
             const amt = parseFloat(document.getElementById('formAmount').value);
             const date = document.getElementById('formDate').value;
             if(!amt || !date) return;
             const catObj = state.categories.find(c => c.name === state.tempCat);
-            const data = { id: state.editingId || Date.now(), amount: amt, date: date, note: document.getElementById('formNote').value, category: state.tempCat, icon: catObj.icon };
-            if(state.editingId) {
-                const idx = state.transactions.findIndex(t => t.id === state.editingId);
-                state.transactions[idx] = data;
-            } else state.transactions.unshift(data);
-            state.transactions.sort((a,b) => b.date.localeCompare(a.date));
-            save(); nav('home');
+            const data = { 
+                id: state.editingId || Date.now(), 
+                amount: amt, 
+                currency: state.tempCurrency || state.currency,
+                date: date, 
+                note: document.getElementById('formNote').value, 
+                category: state.tempCat, 
+                icon: catObj.icon,
+                updated_at: new Date().toISOString()
+            };
+            
+            // 保存到本地 IndexedDB
+            try {
+                await localDB.put('transactions', data);
+                
+                // 更新 state
+                if(state.editingId) {
+                    const idx = state.transactions.findIndex(t => t.id === state.editingId);
+                    state.transactions[idx] = data;
+                } else {
+                    state.transactions.unshift(data);
+                }
+                state.transactions.sort((a,b) => b.date.localeCompare(a.date));
+                
+                // 备份到 localStorage
+                localStorage.setItem('ledger_tx_v13', JSON.stringify(state.transactions));
+                
+                // 背景同步到雲端（不等待结果）
+                if (syncManager && state.isOnline) {
+                    syncManager.syncToCloud().catch(err => console.warn('Background sync failed:', err));
+                }
+                
+            } catch (error) {
+                console.error('❌ Failed to save transaction:', error);
+                // 回退到 localStorage
+                if(state.editingId) {
+                    const idx = state.transactions.findIndex(t => t.id === state.editingId);
+                    state.transactions[idx] = data;
+                } else {
+                    state.transactions.unshift(data);
+                }
+                state.transactions.sort((a,b) => b.date.localeCompare(a.date));
+                localStorage.setItem('ledger_tx_v13', JSON.stringify(state.transactions));
+            }
+            
+            save();
+            nav('home');
         }
 
-        function deleteCurrentTx() { state.transactions = state.transactions.filter(t => t.id !== state.editingId); save(); nav('home'); }
+        async function deleteCurrentTx() {
+            if (!state.editingId) return;
+            
+            try {
+                // 从 IndexedDB 删除
+                await localDB.delete('transactions', state.editingId);
+                
+                // 更新 state
+                state.transactions = state.transactions.filter(t => t.id !== state.editingId);
+                
+                // 备份到 localStorage
+                localStorage.setItem('ledger_tx_v13', JSON.stringify(state.transactions));
+                
+                // 背景同步到雲端（軟刪除）
+                if (syncManager && state.isOnline) {
+                    syncManager.syncToCloud().catch(err => console.warn('Background sync failed:', err));
+                }
+                
+            } catch (error) {
+                console.error('❌ Failed to delete transaction:', error);
+                // 回退到 localStorage
+                state.transactions = state.transactions.filter(t => t.id !== state.editingId);
+                localStorage.setItem('ledger_tx_v13', JSON.stringify(state.transactions));
+            }
+            
+            save();
+            nav('home');
+        }
 
         function renderSettings() {
             document.getElementById('budgetInput').value = state.budget;
             document.getElementById('themePicker').innerHTML = THEME_SCHEMES.map(s => `<div onclick="applyTheme('${s.id}'); renderSettings()" class="theme-dot ${state.themeId === s.id ? 'active' : ''}" style="background-color: ${s.color}; color: ${s.color}"></div>`).join('');
+            document.getElementById('currencyPicker').innerHTML = CURRENCY_OPTIONS.map(c => `
+                <button onclick="changeCurrency('${c.id}')" class="flex flex-col items-center p-4 rounded-2xl transition-all ${state.currency === c.id ? 'dynamic-accent-bg text-black' : 'bg-white/5 text-white/50 hover:bg-white/10'}">
+                    <span class="text-2xl mb-1">${c.flag}</span>
+                    <span class="text-[9px] font-black">${c.id}</span>
+                </button>
+            `).join('');
             document.getElementById('settingsCatList').innerHTML = state.categories.map(c => `<div class="flex justify-between p-3 bg-white/5 rounded-xl"><span>${c.icon} ${c.name}</span><button onclick="deleteCat('${c.name}')"><i data-lucide="trash-2" class="w-3 h-3 text-white/20"></i></button></div>`).join('');
+            
+            // 更新登入狀態显示
+            updateAuthUI();
+            
+            // 更新同步状态
+            updateSyncUI();
+            
             lucide.createIcons();
         }
 
-        function saveSettings() { state.budget = parseFloat(document.getElementById('budgetInput').value) || state.budget; save(); nav('home'); }
+        function updateAuthUI() {
+            const authStatusText = document.getElementById('authStatusText');
+            const authActionBtn = document.getElementById('authActionBtn');
+            const userEmailDisplay = document.getElementById('userEmailDisplay');
+            const userEmailEl = document.getElementById('userEmail');
+            const syncInfoPanel = document.getElementById('syncInfoPanel');
+            const localDataCount = document.getElementById('localDataCount');
+
+            // 更新本地資料統計
+            if (localDataCount) {
+                localDataCount.innerText = `${state.transactions.length} 筆交易`;
+            }
+
+            if (state.isLoggedIn && currentUser) {
+                // 已登入狀態
+                authStatusText.innerText = '✅ 已登入';
+                authStatusText.className = 'text-green-400 font-black';
+                userEmailDisplay.classList.remove('hidden');
+                userEmailEl.innerText = currentUser.email || 'Unknown';
+                syncInfoPanel.classList.remove('hidden');
+                authActionBtn.innerHTML = '🚪 登出帳戶';
+                authActionBtn.onclick = handleSignOut;
+            } else {
+                // 未登入狀態
+                authStatusText.innerText = '本地模式';
+                authStatusText.className = 'text-white/60 font-black';
+                userEmailDisplay.classList.add('hidden');
+                syncInfoPanel.classList.add('hidden');
+                authActionBtn.innerHTML = '🔐 登入雲端帳戶';
+                authActionBtn.onclick = showAuthPage;
+            }
+        }
+
+        function changeCurrency(currencyId) {
+            state.currency = currencyId;
+            save();
+            updateCurrencySymbols();
+            renderSettings();
+            renderHome();
+        }
+
+        async function saveSettings() {
+            state.budget = parseFloat(document.getElementById('budgetInput').value) || state.budget;
+            await save();
+            
+            // 背景同步到雲端
+            if (syncManager && state.isOnline) {
+                syncManager.syncToCloud().catch(err => console.warn('Background sync failed:', err));
+            }
+            
+            nav('home');
+        }
         
         function openCatModal() { 
             document.getElementById('catModal').classList.remove('hidden'); 
@@ -712,6 +2729,15 @@
         }
 
         function closeCatModal() { document.getElementById('catModal').classList.add('hidden'); }
+        
+        function showCloudInfoModal() { 
+            document.getElementById('cloudInfoModal').classList.remove('hidden'); 
+            lucide.createIcons(); // 重新渲染圖示
+        }
+        
+        function closeCloudInfoModal() { 
+            document.getElementById('cloudInfoModal').classList.add('hidden'); 
+        }
         
         function confirmAddCategory() { 
             const name = document.getElementById('newCatName').value.trim(); 
