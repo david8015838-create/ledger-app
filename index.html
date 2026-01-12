@@ -2892,33 +2892,44 @@
                 return;
             }
 
+            if (!supabaseClient) {
+                alert('⚠️ Supabase 未配置，無法使用此功能');
+                return;
+            }
+
             const modal = document.getElementById('loginCodeModal');
             const codeDisplay = document.getElementById('displayLoginCode');
             
             try {
-                // 獲取當前 session
-                const { data: { session }, error } = await supabaseClient.auth.getSession();
+                codeDisplay.innerText = '生成中...';
                 
-                if (error || !session) {
+                // 獲取當前 session
+                const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+                
+                if (sessionError || !session) {
                     throw new Error('無法獲取登入 session');
                 }
                 
                 // 生成新代碼
                 const loginCode = generateLoginCode();
-                const expiresAt = Date.now() + (10 * 60 * 1000); // 10 分鐘後過期
+                const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 分鐘後過期
                 
-                // 儲存到 localStorage（含 session token）
-                const codeData = {
-                    code: loginCode,
-                    userId: currentUser.id,
-                    email: currentUser.email,
-                    accessToken: session.access_token,
-                    refreshToken: session.refresh_token,
-                    expiresAt: expiresAt,
-                    createdAt: Date.now()
-                };
+                // 儲存到 Supabase
+                const { error: insertError } = await supabaseClient
+                    .from('login_codes')
+                    .insert({
+                        code: loginCode,
+                        user_id: currentUser.id,
+                        email: currentUser.email,
+                        access_token: session.access_token,
+                        refresh_token: session.refresh_token,
+                        expires_at: expiresAt.toISOString()
+                    });
                 
-                localStorage.setItem('ledger_login_code', JSON.stringify(codeData));
+                if (insertError) {
+                    console.error('Insert code error:', insertError);
+                    throw new Error('儲存登入代碼失敗：' + insertError.message);
+                }
                 
                 // 顯示代碼
                 codeDisplay.innerText = loginCode;
@@ -2948,6 +2959,7 @@
             } catch (error) {
                 console.error('Generate code error:', error);
                 alert('產生登入代碼失敗：' + error.message);
+                codeDisplay.innerText = '------';
             }
         }
 
@@ -2973,39 +2985,39 @@
             btnText.innerText = '🔄 驗證中...';
 
             try {
-                // 從 localStorage 取得儲存的代碼
-                const storedCodeData = localStorage.getItem('ledger_login_code');
+                // 從 Supabase 查詢代碼
+                const { data: codeData, error: fetchError } = await supabaseClient
+                    .from('login_codes')
+                    .select('*')
+                    .eq('code', codeInput)
+                    .is('used_at', null)
+                    .gt('expires_at', new Date().toISOString())
+                    .single();
                 
-                if (!storedCodeData) {
-                    throw new Error('找不到有效的登入代碼。請先在瀏覽器中登入並產生代碼。');
-                }
-
-                const codeData = JSON.parse(storedCodeData);
-
-                // 檢查代碼是否過期
-                if (Date.now() > codeData.expiresAt) {
-                    localStorage.removeItem('ledger_login_code');
-                    throw new Error('登入代碼已過期，請重新產生。');
-                }
-
-                // 驗證代碼
-                if (codeInput !== codeData.code) {
-                    throw new Error('登入代碼錯誤，請確認後重試。');
+                if (fetchError || !codeData) {
+                    console.error('Fetch code error:', fetchError);
+                    throw new Error('登入代碼無效或已過期。請確認代碼是否正確，或重新產生。');
                 }
 
                 // 代碼正確！使用 access_token 和 refresh_token 來設定 session
                 showAuthMessage('✅ 代碼驗證成功！正在登入...', 'success');
                 
                 // 使用 setSession 方法來登入
-                const { data, error } = await supabaseClient.auth.setSession({
-                    access_token: codeData.accessToken,
-                    refresh_token: codeData.refreshToken
+                const { data: sessionData, error: sessionError } = await supabaseClient.auth.setSession({
+                    access_token: codeData.access_token,
+                    refresh_token: codeData.refresh_token
                 });
 
-                if (error) throw error;
+                if (sessionError) throw sessionError;
+
+                // 標記代碼為已使用
+                await supabaseClient
+                    .from('login_codes')
+                    .update({ used_at: new Date().toISOString() })
+                    .eq('code', codeInput);
 
                 // 登入成功
-                currentUser = data.user;
+                currentUser = sessionData.user;
                 state.isLoggedIn = true;
                 state.userId = currentUser.id;
                 
@@ -3018,9 +3030,6 @@
                 
                 // 清空輸入
                 document.getElementById('loginCode').value = '';
-                
-                // 清除已使用的代碼
-                localStorage.removeItem('ledger_login_code');
                 
                 // 同步資料並跳轉到主頁面
                 setTimeout(async () => {

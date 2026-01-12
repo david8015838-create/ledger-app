@@ -47,6 +47,18 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 5.5 创建登入代码表 (login_codes)
+CREATE TABLE IF NOT EXISTS public.login_codes (
+    code TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    email TEXT NOT NULL,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    used_at TIMESTAMPTZ
+);
+
 -- 6. 创建索引以提升查询性能
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON public.transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON public.transactions(date DESC);
@@ -141,6 +153,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.login_codes ENABLE ROW LEVEL SECURITY;
 
 -- 12. 删除旧的策略（如果存在）
 DROP POLICY IF EXISTS "Users can view own transactions" ON public.transactions;
@@ -206,6 +219,21 @@ CREATE POLICY "Users can update own settings"
     ON public.user_settings FOR UPDATE
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
+
+-- 15.5 创建 RLS 策略：Login Codes 表
+-- 注意：login_codes 表需要特殊的策略，因为验证时用户可能未登录
+DROP POLICY IF EXISTS "Users can insert own login codes" ON public.login_codes;
+DROP POLICY IF EXISTS "Anyone can read valid login codes" ON public.login_codes;
+
+-- 已登录用户可以创建自己的登入代码
+CREATE POLICY "Users can insert own login codes"
+    ON public.login_codes FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+-- 任何人都可以读取未过期且未使用的登入代码（用于验证）
+CREATE POLICY "Anyone can read valid login codes"
+    ON public.login_codes FOR SELECT
+    USING (expires_at > NOW() AND used_at IS NULL);
 
 -- ============================================
 -- 数据库函数：批量 Upsert（用于同步）
