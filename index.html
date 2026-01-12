@@ -789,32 +789,38 @@
 
                     <!-- Auth Tabs -->
                     <div class="glass-panel p-2 rounded-[32px] flex gap-2">
-                        <button id="tabSignIn" onclick="switchAuthTab('signin')" class="auth-tab-active flex-1 py-3 rounded-[24px] text-[11px] font-black transition-all">
-                            Magic Link
+                        <button id="tabMagicLink" onclick="switchAuthTab('magiclink')" class="auth-tab-active flex-1 py-3 rounded-[24px] text-sm font-black transition-all">
+                            ✨ Magic Link
                         </button>
-                        <button id="tabCode" onclick="switchAuthTab('code')" class="auth-tab-inactive flex-1 py-3 rounded-[24px] text-[11px] font-black transition-all">
+                        <button id="tabCode" onclick="switchAuthTab('code')" class="auth-tab-inactive flex-1 py-3 rounded-[24px] text-sm font-black transition-all">
                             🔑 登入代碼
-                        </button>
-                        <button id="tabSignUp" onclick="switchAuthTab('signup')" class="auth-tab-inactive flex-1 py-3 rounded-[24px] text-[11px] font-black transition-all">
-                            註冊
                         </button>
                     </div>
 
-                    <!-- Sign In Form -->
-                    <div id="formSignIn" class="space-y-6">
+                    <!-- Magic Link Form -->
+                    <div id="formMagicLink" class="space-y-6">
                         <div class="glass-panel p-8 rounded-[32px] space-y-6">
+                            <div class="text-center space-y-2 mb-4">
+                                <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+                                    <span class="text-3xl">✨</span>
+                                </div>
+                                <h3 class="text-sm font-black text-white">註冊 / 登入</h3>
+                                <p class="text-[10px] text-white/40">輸入 Email 即可開始使用</p>
+                            </div>
                             <div>
                                 <label class="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-3">Email</label>
-                                <input type="email" id="emailSignIn" placeholder="your@email.com" 
+                                <input type="email" id="emailMagicLink" placeholder="your@email.com" 
                                     class="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-white/30 outline-none focus:border-white/30 transition-colors font-bold">
                             </div>
-                            <button onclick="handleMagicLink('signin')" 
+                            <button onclick="handleMagicLink()" 
                                 class="w-full bg-gradient-to-r from-white/20 to-white/10 backdrop-blur-xl border border-white/20 text-white py-4 rounded-2xl font-black uppercase tracking-wider active:scale-95 transition-all hover:border-white/40">
-                                <span id="btnSignInText">✨ 發送登入連結</span>
+                                <span id="btnMagicLinkText">✨ 發送 Magic Link</span>
                             </button>
                         </div>
                         <p class="text-center text-[10px] text-white/30 leading-relaxed px-6">
-                            我們會將登入連結寄到您的信箱<br>點擊連結即可完成登入，無需密碼
+                            我們會將登入連結寄到您的信箱<br>
+                            點擊連結即可完成註冊或登入，無需密碼<br>
+                            <span class="text-white/20 text-[9px]">適用於在瀏覽器中使用</span>
                         </p>
                     </div>
 
@@ -825,8 +831,8 @@
                                 <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center">
                                     <span class="text-3xl">🔑</span>
                                 </div>
-                                <h3 class="text-sm font-black text-white">輸入登入代碼</h3>
-                                <p class="text-[10px] text-white/40">請輸入從瀏覽器獲得的 6 位數登入代碼</p>
+                                <h3 class="text-sm font-black text-white">跨裝置登入</h3>
+                                <p class="text-[10px] text-white/40">請輸入從其他裝置獲得的 6 位數登入代碼</p>
                             </div>
                             <div>
                                 <input type="text" id="loginCode" placeholder="輸入 6 位數代碼" maxlength="6"
@@ -838,26 +844,18 @@
                                 <span id="btnVerifyCode">✅ 驗證代碼</span>
                             </button>
                         </div>
-                        <p class="text-center text-[10px] text-white/30 leading-relaxed px-6">
-                            代碼有效期為 10 分鐘<br>請在瀏覽器中完成登入後獲取代碼
-                        </p>
-                    </div>
-
-                    <!-- Sign Up Form -->
-                    <div id="formSignUp" class="space-y-6 hidden">
-                        <div class="glass-panel p-8 rounded-[32px] space-y-6">
-                            <div>
-                                <label class="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-3">Email</label>
-                                <input type="email" id="emailSignUp" placeholder="your@email.com" 
-                                    class="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-white/30 outline-none focus:border-white/30 transition-colors font-bold">
-                            </div>
-                            <button onclick="handleMagicLink('signup')" 
-                                class="w-full bg-gradient-to-r from-white/20 to-white/10 backdrop-blur-xl border border-white/20 text-white py-4 rounded-2xl font-black uppercase tracking-wider active:scale-95 transition-all hover:border-white/40">
-                                <span id="btnSignUpText">🚀 發送註冊連結</span>
-                            </button>
+                        <div class="bg-white/5 rounded-2xl p-4 mx-4">
+                            <p class="text-[10px] font-black text-white/40 uppercase mb-2">💡 如何取得代碼？</p>
+                            <ol class="text-[10px] text-white/60 space-y-1 ml-4 list-decimal">
+                                <li>在瀏覽器中使用 Magic Link 登入</li>
+                                <li>前往「設定」頁面</li>
+                                <li>點擊「顯示我的登入代碼」</li>
+                                <li>複製代碼並在此處輸入</li>
+                            </ol>
                         </div>
                         <p class="text-center text-[10px] text-white/30 leading-relaxed px-6">
-                            註冊即表示您同意我們的服務條款<br>您的數據將安全地儲存在雲端
+                            代碼有效期為 10 分鐘<br>
+                            <span class="text-white/20 text-[9px]">適用於 iOS 主畫面 App 或其他裝置</span>
                         </p>
                     </div>
 
@@ -2166,52 +2164,44 @@
         // ============================================
 
         function switchAuthTab(tab) {
-            const signInForm = document.getElementById('formSignIn');
-            const signUpForm = document.getElementById('formSignUp');
+            const magicLinkForm = document.getElementById('formMagicLink');
             const codeForm = document.getElementById('formCode');
-            const signInTab = document.getElementById('tabSignIn');
-            const signUpTab = document.getElementById('tabSignUp');
+            const magicLinkTab = document.getElementById('tabMagicLink');
             const codeTab = document.getElementById('tabCode');
             
             // Hide all forms
-            signInForm.classList.add('hidden');
-            signUpForm.classList.add('hidden');
+            magicLinkForm.classList.add('hidden');
             codeForm.classList.add('hidden');
             
             // Reset all tabs to inactive
-            signInTab.className = 'auth-tab-inactive flex-1 py-3 rounded-[24px] text-[11px] font-black transition-all';
-            signUpTab.className = 'auth-tab-inactive flex-1 py-3 rounded-[24px] text-[11px] font-black transition-all';
-            codeTab.className = 'auth-tab-inactive flex-1 py-3 rounded-[24px] text-[11px] font-black transition-all';
+            magicLinkTab.className = 'auth-tab-inactive flex-1 py-3 rounded-[24px] text-sm font-black transition-all';
+            codeTab.className = 'auth-tab-inactive flex-1 py-3 rounded-[24px] text-sm font-black transition-all';
             
             // Show selected form and activate tab
-            if (tab === 'signin') {
-                signInForm.classList.remove('hidden');
-                signInTab.className = 'auth-tab-active flex-1 py-3 rounded-[24px] text-[11px] font-black transition-all';
-            } else if (tab === 'code') {
+            if (tab === 'code') {
                 codeForm.classList.remove('hidden');
-                codeTab.className = 'auth-tab-active flex-1 py-3 rounded-[24px] text-[11px] font-black transition-all';
+                codeTab.className = 'auth-tab-active flex-1 py-3 rounded-[24px] text-sm font-black transition-all';
             } else {
-                signUpForm.classList.remove('hidden');
-                signUpTab.className = 'auth-tab-active flex-1 py-3 rounded-[24px] text-[11px] font-black transition-all';
+                // Default to magic link
+                magicLinkForm.classList.remove('hidden');
+                magicLinkTab.className = 'auth-tab-active flex-1 py-3 rounded-[24px] text-sm font-black transition-all';
             }
         }
 
-        async function handleMagicLink(type) {
+        async function handleMagicLink() {
             if (!supabaseClient) {
                 showAuthMessage('⚠️ Supabase 未配置，無法使用雲端功能', 'error');
                 return;
             }
 
-            const email = type === 'signin' ? 
-                document.getElementById('emailSignIn').value.trim() : 
-                document.getElementById('emailSignUp').value.trim();
+            const email = document.getElementById('emailMagicLink').value.trim();
 
             if (!email || !email.includes('@')) {
                 showAuthMessage('❌ 請輸入有效的 Email 地址', 'error');
                 return;
             }
 
-            const btnText = type === 'signin' ? document.getElementById('btnSignInText') : document.getElementById('btnSignUpText');
+            const btnText = document.getElementById('btnMagicLinkText');
             const originalText = btnText.innerText;
             btnText.innerText = '🔄 發送中...';
 
@@ -2231,22 +2221,19 @@
                                          /iPhone|iPad|iPod/.test(navigator.userAgent));
                 
                 if (isIOSStandalone) {
-                    showAuthMessage(`✅ 登入連結已發送至 ${email}<br><br>
+                    showAuthMessage(`✅ Magic Link 已發送至 ${email}<br><br>
                         <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mt-3 text-left">
                             <p class="text-[10px] font-black text-yellow-400 uppercase mb-2">⚠️ iOS 主畫面 App 提示</p>
-                            <p class="text-[10px] text-yellow-400/80 mb-3">請在 Safari 瀏覽器中開啟信箱連結完成登入，然後再回到此 App。</p>
+                            <p class="text-[10px] text-yellow-400/80 mb-3">請在 Safari 瀏覽器中開啟信箱連結完成登入。</p>
+                            <p class="text-[10px] text-white/60 mb-3">登入後可產生「登入代碼」，再回到此 App 使用代碼登入。</p>
                             <p class="text-[10px] text-white/60">或選擇下方「僅使用本地模式」跳過登入。</p>
                         </div>`, 'success');
                 } else {
-                    showAuthMessage(`✅ 登入連結已發送至 ${email}<br>請檢查您的信箱並點擊連結完成登入`, 'success');
+                    showAuthMessage(`✅ Magic Link 已發送至 ${email}<br>請檢查您的信箱並點擊連結完成註冊/登入`, 'success');
                 }
                 
                 // Clear email input
-                if (type === 'signin') {
-                    document.getElementById('emailSignIn').value = '';
-                } else {
-                    document.getElementById('emailSignUp').value = '';
-                }
+                document.getElementById('emailMagicLink').value = '';
 
             } catch (error) {
                 console.error('Magic link error:', error);
