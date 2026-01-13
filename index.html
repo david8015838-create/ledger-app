@@ -2489,6 +2489,9 @@
                             // 登录后执行首次同步：如果云端为空，先上传本地数据；否则执行双向合并
                             console.log('🔄 Checking cloud data after login...');
                             try {
+                                // 确保本地数据已加载到 state
+                                await loadDataFromLocal();
+                                
                                 // 先检查云端是否有数据
                                 const { data: cloudCheck, error: checkError } = await supabaseClient
                                     .from('transactions')
@@ -2497,7 +2500,11 @@
                                     .limit(1);
                                 
                                 const hasCloudData = !checkError && cloudCheck && cloudCheck.length > 0;
-                                const hasLocalData = state.transactions && state.transactions.length > 0;
+                                // 直接从 IndexedDB 检查本地数据（包括已删除的，用于判断是否有数据）
+                                const localDataCheck = await localDB.getAll('transactions');
+                                const hasLocalData = localDataCheck && localDataCheck.length > 0;
+                                
+                                console.log(`📊 Cloud data: ${hasCloudData ? 'exists' : 'empty'}, Local data: ${hasLocalData ? 'exists' : 'empty'}`);
                                 
                                 if (!hasCloudData && hasLocalData) {
                                     // 首次登录：云端为空，本地有数据，先上传本地数据
@@ -2514,10 +2521,13 @@
                                     await syncManager.syncFromCloud();
                                 }
                                 
-                                await loadDataFromLocal(); // 重新加载合并后的数据
+                                // 重新加载合并后的数据
+                                await loadDataFromLocal();
                                 console.log('✅ Data synchronized. All devices will show the same data.');
                             } catch (error) {
                                 console.warn('⚠️ Failed to sync data:', error);
+                                // 即使同步失败，也确保加载本地数据
+                                await loadDataFromLocal();
                             }
                             
                             // 刷新UI
@@ -2567,6 +2577,9 @@
                                 
                                 // 检查并同步数据（首次登录时上传本地数据）
                                 try {
+                                    // 确保本地数据已加载
+                                    await loadDataFromLocal();
+                                    
                                     // 先检查云端是否有数据
                                     const { data: cloudCheck, error: checkError } = await supabaseClient
                                         .from('transactions')
@@ -2577,6 +2590,8 @@
                                     const hasCloudData = !checkError && cloudCheck && cloudCheck.length > 0;
                                     const localData = await localDB.getAll('transactions');
                                     const hasLocalData = localData && localData.length > 0;
+                                    
+                                    console.log(`📊 Cloud data: ${hasCloudData ? 'exists' : 'empty'}, Local data: ${hasLocalData ? 'exists' : 'empty'}`);
                                     
                                     if (!hasCloudData && hasLocalData) {
                                         // 首次登录：云端为空，本地有数据，先上传本地数据
@@ -2593,9 +2608,13 @@
                                         await syncManager.syncFromCloud();
                                     }
                                     
+                                    // 重新加载合并后的数据
                                     await loadDataFromLocal();
+                                    console.log('✅ Data synchronized. All devices will show the same data.');
                                 } catch (error) {
                                     console.warn('⚠️ Failed to sync data:', error);
+                                    // 即使同步失败，也确保加载本地数据
+                                    await loadDataFromLocal();
                                 }
                                 
                                 showMainApp();
@@ -2633,6 +2652,9 @@
                     if (state.isLoggedIn && currentUser) {
                         console.log('🔄 Checking cloud data on startup...');
                         try {
+                            // 确保本地数据已加载
+                            await loadDataFromLocal();
+                            
                             // 先检查云端是否有数据
                             const { data: cloudCheck, error: checkError } = await supabaseClient
                                 .from('transactions')
@@ -2641,7 +2663,11 @@
                                 .limit(1);
                             
                             const hasCloudData = !checkError && cloudCheck && cloudCheck.length > 0;
-                            const hasLocalData = state.transactions && state.transactions.length > 0;
+                            // 直接从 IndexedDB 检查本地数据（包括已删除的，用于判断是否有数据）
+                            const localDataCheck = await localDB.getAll('transactions');
+                            const hasLocalData = localDataCheck && localDataCheck.length > 0;
+                            
+                            console.log(`📊 Cloud data: ${hasCloudData ? 'exists' : 'empty'}, Local data: ${hasLocalData ? 'exists' : 'empty'}`);
                             
                             if (!hasCloudData && hasLocalData) {
                                 // 首次登录：云端为空，本地有数据，先上传本地数据
@@ -2658,11 +2684,15 @@
                                 await syncManager.syncFromCloud();
                             }
                             
-                            await loadDataFromLocal(); // 重新加载合并后的数据
+                            // 重新加载合并后的数据
+                            await loadDataFromLocal();
                             renderAll(); // 刷新UI
                             console.log('✅ Data synchronized. All devices will show the same data.');
                         } catch (error) {
                             console.warn('⚠️ Failed to sync data:', error);
+                            // 即使同步失败，也确保加载本地数据并刷新UI
+                            await loadDataFromLocal();
+                            renderAll();
                         }
                     }
                 } else {
