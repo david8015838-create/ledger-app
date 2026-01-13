@@ -1477,6 +1477,16 @@
                 this.syncError = null;
                 updateSyncUI();
 
+                // 设置超时机制（60秒）
+                const syncTimeout = setTimeout(() => {
+                    if (this.isSyncing) {
+                        console.error('❌ Sync timeout after 60 seconds');
+                        this.isSyncing = false;
+                        this.syncError = '同步超时，请检查网络连接后重试';
+                        updateSyncUI();
+                    }
+                }, 60000);
+
                 try {
                     console.log('🔄 Starting bidirectional merge sync...');
 
@@ -1541,20 +1551,28 @@
                     }
                     
                     // 更新本地：保存完整的合并数据（包括已删除的，用于同步）
-                    for (const tx of mergedTransactions) {
-                        await this.localDB.put('transactions', {
-                            id: tx.id,
-                            amount: parseFloat(tx.amount),
-                            date: tx.date,
-                            note: tx.note || '',
-                            category: tx.category,
-                            icon: tx.icon,
-                            currency: tx.currency || 'TWD',
-                            updated_at: tx.updated_at,
-                            is_deleted: tx.is_deleted || false
-                        });
+                    // 批量处理，避免循环过慢
+                    if (mergedTransactions.length > 0) {
+                        const batchSize = 100;
+                        for (let i = 0; i < mergedTransactions.length; i += batchSize) {
+                            const batch = mergedTransactions.slice(i, i + batchSize);
+                            await Promise.all(batch.map(tx => 
+                                this.localDB.put('transactions', {
+                                    id: tx.id,
+                                    amount: parseFloat(tx.amount),
+                                    date: tx.date,
+                                    note: tx.note || '',
+                                    category: tx.category,
+                                    icon: tx.icon,
+                                    currency: tx.currency || 'TWD',
+                                    updated_at: tx.updated_at,
+                                    is_deleted: tx.is_deleted || false
+                                })
+                            ));
+                            console.log(`💾 Saved batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(mergedTransactions.length / batchSize)}`);
+                        }
+                        console.log(`✅ Saved ${mergedTransactions.length} merged transactions to local`);
                     }
-                    console.log(`✅ Saved ${mergedTransactions.length} merged transactions to local`);
 
                     // 2. 同步分类
                     const categories = await this.localDB.getAll('categories');
@@ -1644,6 +1662,7 @@
                     this.hasSyncedThisSession = true; // 标记本会话已同步
                     await this.setLastSyncTime(this.lastSyncTime);
 
+                    clearTimeout(syncTimeout);
                     this.isSyncing = false;
                     updateSyncUI();
 
@@ -1651,12 +1670,21 @@
 
                 } catch (error) {
                     console.error('❌ Sync failed:', error);
-                    this.syncError = error.message;
+                    clearTimeout(syncTimeout);
+                    this.syncError = error.message || '未知错误';
                     this.isSyncing = false;
                     updateSyncUI();
 
                     // 靜默處理錯誤，不影響使用者體驗
-                    return { success: false, error: error.message };
+                    return { success: false, error: this.syncError };
+                } finally {
+                    // 确保状态总是被重置
+                    clearTimeout(syncTimeout);
+                    if (this.isSyncing) {
+                        console.warn('⚠️ Sync state was not properly reset, forcing reset');
+                        this.isSyncing = false;
+                        updateSyncUI();
+                    }
                 }
             }
 
@@ -2173,7 +2201,10 @@
 
         // 手动同步按钮（双向增量合并）
         async function manualSync() {
-            if (!syncManager || syncManager.isSyncing) return;
+            if (!syncManager || syncManager.isSyncing) {
+                console.warn('⚠️ Sync already in progress or syncManager not available');
+                return;
+            }
 
             // 保存本地数据快照，用于失败时撤销
             let localSnapshot = null;
@@ -2184,6 +2215,17 @@
             }
 
             updateSyncUI();
+            
+            // 设置同步超时（90秒总超时）
+            const manualSyncTimeout = setTimeout(() => {
+                if (syncManager && syncManager.isSyncing) {
+                    console.error('❌ Manual sync timeout after 90 seconds');
+                    syncManager.isSyncing = false;
+                    syncManager.syncError = '同步超时，请检查网络连接后重试';
+                    updateSyncUI();
+                    alert('⚠️ 同步超时！\n\n请检查网络连接后重试。如果问题持续，请刷新页面。');
+                }
+            }, 90000);
             
             try {
                 console.log('🔄 Starting bidirectional merge sync...');
@@ -2289,8 +2331,14 @@
                     }
                 }
                 
-                alert('❌ 同步出错：' + error.message + '\n\n本地更改已撤销。');
+                alert('❌ 同步出错：' + (error.message || '未知错误') + '\n\n本地更改已撤销。');
             } finally {
+                clearTimeout(manualSyncTimeout);
+                // 确保同步状态被重置
+                if (syncManager && syncManager.isSyncing) {
+                    console.warn('⚠️ Forcing sync state reset in finally block');
+                    syncManager.isSyncing = false;
+                }
                 updateSyncUI();
             }
         }
