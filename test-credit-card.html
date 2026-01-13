@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>信用卡功能測試</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: #0a0a0c;
+            color: white;
+            padding: 20px;
+        }
+        .test-item {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+        }
+        .success {
+            color: #10b981;
+        }
+        .error {
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 信用卡功能測試頁面</h1>
+    <p>這個頁面用來確認你的 index.html 是否包含信用卡功能</p>
+    
+    <div id="results"></div>
+    
+    <script>
+        const results = [];
+        
+        function addResult(name, passed, details) {
+            results.push({ name, passed, details });
+        }
+        
+        // 測試 1: 檢查 index.html 文件大小
+        fetch('index.html')
+            .then(response => response.text())
+            .then(html => {
+                const lines = html.split('\n').length;
+                addResult('文件行數', lines > 4900, `index.html 有 ${lines} 行（應該約 4980 行）`);
+                
+                // 測試 2: 檢查信用卡相關代碼
+                const hasCreditCard = html.includes('信用卡管理');
+                addResult('信用卡管理', hasCreditCard, hasCreditCard ? '✓ 找到信用卡管理代碼' : '✗ 未找到信用卡管理');
+                
+                // 測試 3: 檢查分期功能
+                const hasInstallments = html.includes('installments');
+                addResult('分期功能', hasInstallments, hasInstallments ? '✓ 找到分期功能代碼' : '✗ 未找到分期功能');
+                
+                // 測試 4: 檢查利息計算
+                const hasInterest = html.includes('calculateCreditDetails');
+                addResult('利息計算', hasInterest, hasInterest ? '✓ 找到利息計算函數' : '✗ 未找到利息計算函數');
+                
+                // 測試 5: 檢查帳單計算
+                const hasBilling = html.includes('calculateCreditCardBillThisMonth');
+                addResult('帳單計算', hasBilling, hasBilling ? '✓ 找到帳單計算函數' : '✗ 未找到帳單計算函數');
+                
+                // 測試 6: 檢查初始欠款
+                const hasInitialBalance = html.includes('initialBalance');
+                addResult('初始欠款', hasInitialBalance, hasInitialBalance ? '✓ 找到初始欠款功能' : '✗ 未找到初始欠款功能');
+                
+                // 測試 7: 檢查雲端同步
+                const hasCreditSync = html.includes('credit_cards');
+                addResult('雲端同步', hasCreditSync, hasCreditSync ? '✓ 找到信用卡同步代碼' : '✗ 未找到信用卡同步代碼');
+                
+                // 顯示結果
+                displayResults();
+            })
+            .catch(error => {
+                document.getElementById('results').innerHTML = `
+                    <div class="test-item error">
+                        <h3>❌ 錯誤</h3>
+                        <p>無法讀取 index.html 文件</p>
+                        <p>錯誤信息: ${error.message}</p>
+                        <p><strong>請確認：</strong></p>
+                        <ol>
+                            <li>你是否用本地 HTTP 服務器打開這個文件？</li>
+                            <li>index.html 和 test-credit-card.html 在同一目錄嗎？</li>
+                        </ol>
+                        <p>建議：在終端運行 <code>python3 -m http.server 8000</code> 然後訪問 http://localhost:8000/test-credit-card.html</p>
+                    </div>
+                `;
+            });
+        
+        function displayResults() {
+            const passedCount = results.filter(r => r.passed).length;
+            const totalCount = results.length;
+            
+            let html = `
+                <div class="test-item ${passedCount === totalCount ? 'success' : 'error'}">
+                    <h2>測試結果: ${passedCount}/${totalCount} 通過</h2>
+                    ${passedCount === totalCount ? 
+                        '<p>🎉 恭喜！你的 index.html 包含完整的信用卡功能！</p>' : 
+                        '<p>⚠️ 你的 index.html 可能不是最新版本</p>'
+                    }
+                </div>
+            `;
+            
+            results.forEach(result => {
+                html += `
+                    <div class="test-item">
+                        <h3>${result.passed ? '✅' : '❌'} ${result.name}</h3>
+                        <p>${result.details}</p>
+                    </div>
+                `;
+            });
+            
+            if (passedCount !== totalCount) {
+                html += `
+                    <div class="test-item error">
+                        <h3>🔧 解決方案</h3>
+                        <ol>
+                            <li><strong>清除瀏覽器緩存:</strong> Ctrl+Shift+Delete（Windows）或 Cmd+Shift+Delete（Mac）</li>
+                            <li><strong>強制刷新:</strong> Ctrl+Shift+R（Windows）或 Cmd+Shift+R（Mac）</li>
+                            <li><strong>使用無痕模式:</strong> 打開無痕視窗重新測試</li>
+                            <li><strong>確認文件:</strong> 檢查你打開的 index.html 是否在正確的目錄</li>
+                        </ol>
+                        <p><strong>當前目錄應該是:</strong> /Users/chenyouwei/Desktop/Ledger(cursor)/ledger-app-1/index.html</p>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('results').innerHTML = html;
+        }
+    </script>
+</body>
+</html>
