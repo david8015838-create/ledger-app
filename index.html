@@ -1082,7 +1082,7 @@
                             <span id="syncBtnText">🔄 立即同步到雲端</span>
                         </button>
                         <p class="text-[9px] text-white/30 text-center">
-                            💡 提示：應用會在打開時自動同步。雲端僅保留最近 365 天的資料，本地資料永久保留。
+                            💡 提示：請點擊「立即同步到雲端」按鈕來同步資料。雲端僅保留最近 365 天的資料，本地資料永久保留。
                         </p>
                     </div>
                 </div>
@@ -1166,7 +1166,7 @@
                             <span class="text-lg">☁️</span>
                             <div>
                                 <h3 class="font-black text-white mb-1">雲端備份</h3>
-                                <p class="text-xs text-white/60">登入帳戶後，資料會自動同步到雲端，方便跨裝置使用。</p>
+                                <p class="text-xs text-white/60">登入帳戶後，點擊「立即同步到雲端」按鈕即可同步資料，方便跨裝置使用。</p>
                             </div>
                         </div>
                     </div>
@@ -1186,8 +1186,8 @@
                         <div class="flex items-start gap-3">
                             <span class="text-lg">🔄</span>
                             <div>
-                                <h3 class="font-black text-white mb-1">自動同步</h3>
-                                <p class="text-xs text-white/60">應用程式會在開啟時自動同步，您也可以手動點擊同步按鈕。</p>
+                                <h3 class="font-black text-white mb-1">手動同步</h3>
+                                <p class="text-xs text-white/60">點擊「立即同步到雲端」按鈕來同步資料。同步會上傳本地資料並下載雲端最新資料。</p>
                             </div>
                         </div>
                     </div>
@@ -2265,15 +2265,8 @@
                                 syncManager = new SyncManager(localDB, supabaseClient);
                             }
                             
-                            // 登录后从云端拉取数据（但不自动上传，需要用户手动点击同步）
-                            console.log('🔄 Pulling data from cloud after login...');
-                            try {
-                                await syncManager.syncFromCloud();
-                                await loadDataFromLocal(); // 重新加载合并后的数据
-                                console.log('✅ Data pulled from cloud. Use manual sync button to upload local changes.');
-                            } catch (error) {
-                                console.warn('⚠️ Failed to pull data from cloud:', error);
-                            }
+                            // 不再自动同步，需要用户手动点击同步按钮
+                            console.log('✅ User signed in. Use manual sync button to sync data.');
                             
                             // 刷新UI
                             renderAll();
@@ -2318,17 +2311,9 @@
                     // 获取最后同步时间
                     syncManager.lastSyncTime = await syncManager.getLastSyncTime();
 
-                    // 如果已登录，从云端拉取数据（但不自动上传，需要用户手动点击同步）
+                    // 不再自动同步，需要用户手动点击同步按钮
                     if (state.isLoggedIn && currentUser) {
-                        console.log('🔄 Pulling data from cloud on startup...');
-                        try {
-                            await syncManager.syncFromCloud();
-                            await loadDataFromLocal(); // 重新加载合并后的数据
-                            renderAll(); // 刷新UI
-                            console.log('✅ Data pulled from cloud. Use manual sync button to upload local changes.');
-                        } catch (error) {
-                            console.warn('⚠️ Failed to pull data from cloud:', error);
-                        }
+                        console.log('✅ App initialized. Use manual sync button to sync data.');
                     }
                 } else {
                     console.log('ℹ️ Running in local-only mode (Supabase not configured)');
@@ -3241,19 +3226,10 @@
                 // 清空輸入
                 document.getElementById('loginCode').value = '';
                 
-                // 跳轉到主頁面（从云端拉取数据，但不自动上传）
+                // 跳轉到主頁面（不再自动同步）
                 setTimeout(async () => {
                     if (syncManager) {
-                        // 从云端拉取数据（但不自动上传，需要用户手动点击同步）
-                        try {
-                            console.log('🔄 Pulling data from cloud after code login...');
-                            await syncManager.syncFromCloud();
-                            await loadDataFromLocal();
-                            console.log('✅ Data pulled from cloud. Use manual sync button to upload local changes.');
-                        } catch (error) {
-                            console.warn('⚠️ Failed to pull data from cloud:', error);
-                            await loadDataFromLocal();
-                        }
+                        await loadDataFromLocal();
                     }
                     showMainApp();
                     renderAll();

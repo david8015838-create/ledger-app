@@ -109,7 +109,7 @@ open http://localhost:8000
 2. 输入金额、选择分类、币种
 3. 点击「完成」
 
-**自动同步：** 每次保存后，数据会自动同步到云端（后台进行，不影响使用）
+**手动同步：** 请点击「立即同步到云端」按钮来同步数据
 
 ### 手动同步
 
@@ -255,13 +255,14 @@ console.log(JSON.stringify(state.transactions, null, 2));
 - 基于 `updated_at` 时间戳判断
 - 云端数据永远不会覆盖本地数据
 
-### 自动同步时机
+### 手动同步模式
 
-- ✅ 打开应用时（如果超过 1 小时未同步）
-- ✅ 新增/修改/删除交易后（后台进行）
-- ✅ 修改预算/设置后（后台进行）
-- ✅ 网络恢复在线时（自动触发）
-- ✅ 用户手动点击同步按钮
+应用采用**手动同步模式**，只有在用户点击「立即同步到云端」按钮时才会同步：
+
+- ✅ 用户手动点击「立即同步到云端」按钮
+  - 先上传本地数据到云端
+  - 再从云端拉取最新数据
+  - 合并本地和云端数据
 
 ---
 
@@ -269,7 +270,7 @@ console.log(JSON.stringify(state.transactions, null, 2));
 
 ### 1. 定期同步
 
-虽然应用会自动同步，但建议：
+应用需要手动同步，建议：
 - 每周手动同步一次（确保数据安全）
 - 在重要操作后手动同步（如批量删除）
 
@@ -304,7 +305,7 @@ console.log(JSON.stringify(state.transactions, null, 2));
 ✅ IndexedDB initialized
 📂 Loading data from IndexedDB...
 ✅ Loaded 42 transactions, 5 categories
-🔄 Auto-syncing from cloud...
+🔄 Manual sync required - click "立即同步到云端" button
 ✅ Pulled 40 transactions from cloud
 ✅ Synced 42 transactions
 ✅ Cleaned up 5 old records from cloud
