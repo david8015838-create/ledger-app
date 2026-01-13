@@ -973,6 +973,7 @@
                             </div>
                         </div>
                         <p id="budgetMessage" class="text-[10px] font-bold uppercase tracking-widest transition-colors duration-300"></p>
+                        <div id="creditCardDueDisplay"></div>
                     </div>
                 </div>
 
@@ -980,6 +981,9 @@
                     <h3 class="text-[10px] font-black uppercase text-white/30 tracking-widest mb-4 ml-2">Recent Activities</h3>
                     <div id="recentList" class="space-y-3"></div>
                 </div>
+                
+                <!-- 未来预定支出预览 -->
+                <div id="futureExpensesPreview"></div>
             </section>
 
             <section id="page-history" class="page-transition hidden-page space-y-4">
@@ -1094,6 +1098,15 @@
                     </div>
                     <div id="settingsCatList" class="grid grid-cols-2 gap-2"></div>
                 </div>
+
+                <!-- 信用卡管理 -->
+                <div class="glass-panel p-6 rounded-3xl space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xs font-black uppercase text-white/40 tracking-widest">Credit Cards</h3>
+                        <button onclick="openCardModal()" class="text-[10px] bg-white/10 px-3 py-1 rounded-full">+ 新增</button>
+                    </div>
+                    <div id="settingsCardList" class="space-y-2"></div>
+                </div>
             </section>
 
             <section id="page-add" class="page-transition hidden-page space-y-8">
@@ -1108,6 +1121,41 @@
                     <div id="formCurrencyGrid" class="grid grid-cols-3 gap-3 mb-4"></div>
                 </div>
                 <div id="formCatGrid" class="grid grid-cols-4 gap-3"></div>
+                
+                <!-- 支付方式选择 -->
+                <div class="glass-panel p-6 rounded-[32px] space-y-4">
+                    <p class="text-[9px] font-black text-white/20 uppercase tracking-widest mb-2 text-center">支付方式</p>
+                    <div class="flex gap-3">
+                        <button id="paymentCashBtn" onclick="selectPaymentMethod('cash')" class="flex-1 py-4 dynamic-accent-bg text-black rounded-2xl font-black">
+                            💵 現金
+                        </button>
+                        <button id="paymentCreditBtn" onclick="selectPaymentMethod('credit')" class="flex-1 py-4 glass-panel rounded-2xl font-bold text-white/50">
+                            💳 信用卡
+                        </button>
+                    </div>
+                    <!-- 信用卡选择下拉菜单 -->
+                    <div id="cardSelectContainer" class="hidden">
+                        <select id="cardSelect" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white mb-3">
+                            <option value="">請選擇信用卡</option>
+                        </select>
+                        <!-- 分期期数输入 -->
+                        <div class="mb-3">
+                            <label class="text-[9px] font-bold text-white/40 uppercase mb-2 block">分期期數（預設 1 期）</label>
+                            <input type="number" id="formInstallments" min="1" max="24" value="1" placeholder="1" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                        </div>
+                        <!-- 年利率输入 -->
+                        <div>
+                            <label class="text-[9px] font-bold text-white/40 uppercase mb-2 block">年利率（%，預設 0）</label>
+                            <input type="number" id="formInterestRate" min="0" max="100" step="0.01" value="0" placeholder="0" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                        </div>
+                        <!-- 每期金额试算显示 -->
+                        <div id="installmentPreview" class="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl hidden">
+                            <div class="text-[9px] font-bold text-blue-400/80 uppercase tracking-wider mb-1">每期試算</div>
+                            <div class="text-sm font-black text-blue-400" id="installmentAmountDisplay"></div>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="glass-panel p-6 rounded-[32px] space-y-4">
                     <div class="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center">
                         <div class="flex-1 min-w-0 sm:min-w-[140px]">
@@ -1136,6 +1184,53 @@
                 <div class="flex gap-3">
                     <button onclick="closeCatModal()" class="flex-1 py-4 glass-panel rounded-2xl font-bold">取消</button>
                     <button id="confirmCatBtn" class="flex-1 py-4 dynamic-accent-bg text-black rounded-2xl font-black opacity-30 pointer-events-none">請選擇圖示</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 信用卡管理 Modal -->
+        <div id="cardModal" class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 hidden">
+            <div class="glass-panel w-full max-w-sm rounded-[40px] p-8 space-y-6">
+                <h2 class="text-xl font-black" id="cardModalTitle">新增信用卡</h2>
+                <input type="text" id="cardName" placeholder="信用卡名稱（例如：國泰）" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[10px] font-bold text-white/40 uppercase mb-2 block">結帳日（每月幾號）</label>
+                        <input type="number" id="cardClosingDay" placeholder="1-31" min="1" max="31" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-white/40 uppercase mb-2 block">結帳後幾天繳款</label>
+                        <input type="number" id="cardDueDays" placeholder="例如：15" min="1" max="60" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-white/40 uppercase mb-2 block">初始未繳清餘額（選填）</label>
+                        <input type="number" id="cardInitialBalance" placeholder="例如：5000" min="0" step="0.01" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                        <p class="text-[8px] text-white/30 mt-1">使用此 App 前已存在的未繳清帳單總額</p>
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="closeCardModal()" class="flex-1 py-4 glass-panel rounded-2xl font-bold">取消</button>
+                    <button id="confirmCardBtn" onclick="confirmAddCard()" class="flex-1 py-4 dynamic-accent-bg text-black rounded-2xl font-black">確認</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 还款 Modal -->
+        <div id="paymentModal" class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 hidden">
+            <div class="glass-panel w-full max-w-sm rounded-[40px] p-8 space-y-6">
+                <h2 class="text-xl font-black" id="paymentModalTitle">記錄還款</h2>
+                <div id="paymentCardInfo" class="text-sm text-white/60 mb-4"></div>
+                <div id="paymentBillInfo" class="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl mb-4">
+                    <div class="text-[10px] font-bold text-yellow-400/80 uppercase tracking-wider mb-1">本月應繳總額</div>
+                    <div class="text-lg font-black text-yellow-400" id="paymentTotalAmount"></div>
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-white/40 uppercase mb-2 block">還款金額</label>
+                    <input type="number" id="paymentAmount" placeholder="輸入還款金額" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="closePaymentModal()" class="flex-1 py-4 glass-panel rounded-2xl font-bold">取消</button>
+                    <button onclick="confirmPayment()" class="flex-1 py-4 dynamic-accent-bg text-black rounded-2xl font-black">確認還款</button>
                 </div>
             </div>
         </div>
@@ -1527,7 +1622,7 @@
                     // 步骤 C：更新云端和本地
                     console.log('💾 Step C: Writing merged data...');
                     
-                    // 更新云端：上传完整的合并数据（包括已删除的）
+                    // 更新云端：上传完整的合并数据（包括已删除的和信用卡字段）
                     if (mergedTransactions.length > 0) {
                         const txData = mergedTransactions.map(tx => ({
                             id: tx.id,
@@ -1538,6 +1633,11 @@
                             category: tx.category,
                             icon: tx.icon,
                             currency: tx.currency || 'TWD',
+                            payment_method: tx.paymentMethod || tx.payment_method || 'cash',
+                            card_id: tx.cardId || tx.card_id || null,
+                            installments: tx.installments || 1,
+                            interest_rate: tx.interestRate || tx.interest_rate || 0,
+                            billing_month: tx.billingMonth || tx.billing_month || null,
                             updated_at: tx.updated_at,
                             is_deleted: tx.is_deleted || false
                         }));
@@ -1550,7 +1650,7 @@
                         console.log(`✅ Uploaded ${mergedTransactions.length} merged transactions to cloud`);
                     }
                     
-                    // 更新本地：保存完整的合并数据（包括已删除的，用于同步）
+                    // 更新本地：保存完整的合并数据（包括已删除的和信用卡字段，用于同步）
                     // 批量处理，避免循环过慢
                     if (mergedTransactions.length > 0) {
                         const batchSize = 100;
@@ -1565,6 +1665,11 @@
                                     category: tx.category,
                                     icon: tx.icon,
                                     currency: tx.currency || 'TWD',
+                                    paymentMethod: tx.payment_method || tx.paymentMethod || 'cash',
+                                    cardId: tx.card_id || tx.cardId || null,
+                                    installments: tx.installments || 1,
+                                    interestRate: tx.interest_rate || tx.interestRate || 0,
+                                    billingMonth: tx.billing_month || tx.billingMonth || null,
                                     updated_at: tx.updated_at,
                                     is_deleted: tx.is_deleted || false
                                 })
@@ -1646,6 +1751,28 @@
 
                     if (settingsError) throw settingsError;
                     console.log('✅ Synced user settings');
+
+                    // 3.5. 同步信用卡数据
+                    if (state.cards && state.cards.length > 0) {
+                        const cardData = state.cards.map(card => ({
+                            id: card.id,
+                            user_id: currentUser.id,
+                            name: card.name,
+                            closing_day: card.closingDay,
+                            due_days_after: card.dueDaysAfter,
+                            carrying_balance: card.carryingBalance || 0,
+                            initial_balance: card.initialBalance || 0,
+                            updated_at: card.updated_at || now,
+                            is_deleted: card.is_deleted || false
+                        }));
+
+                        const { error: cardError } = await this.supabaseClient
+                            .from('credit_cards')
+                            .upsert(cardData, { onConflict: 'id' });
+
+                        if (cardError) throw cardError;
+                        console.log(`✅ Synced ${state.cards.length} credit cards`);
+                    }
 
                     // 4. 執行雲端資料清理（刪除 365 天前的資料）
                     const { data: cleanupResult, error: cleanupError } = await this.supabaseClient
@@ -1766,6 +1893,17 @@
 
                     if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
 
+                    // 3.5. 拉取信用卡数据
+                    const { data: creditCards, error: cardError } = await this.supabaseClient
+                        .from('credit_cards')
+                        .select('*')
+                        .eq('user_id', currentUser.id)
+                        .eq('is_deleted', false);
+
+                    if (cardError && cardError.code !== 'PGRST116') {
+                        console.warn('⚠️ Failed to fetch credit cards:', cardError);
+                    }
+
                     // 4. 执行双向合并：获取本地数据并合并
                     const localTransactions = await this.localDB.getAll('transactions');
                     
@@ -1785,7 +1923,7 @@
                     // 执行双向合并
                     const mergedTransactions = this.mergeTransactions(normalizedCloud, normalizedLocal);
                     
-                    // 保存合并后的数据到本地（包括已删除的记录，用于同步）
+                    // 保存合并后的数据到本地（包括已删除的记录和信用卡字段）
                     let savedCount = 0;
                     for (const tx of mergedTransactions) {
                         await this.localDB.put('transactions', {
@@ -1796,6 +1934,11 @@
                             category: tx.category,
                             icon: tx.icon,
                             currency: tx.currency || 'TWD',
+                            paymentMethod: tx.payment_method || tx.paymentMethod || 'cash',
+                            cardId: tx.card_id || tx.cardId || null,
+                            installments: tx.installments || 1,
+                            interestRate: tx.interest_rate || tx.interestRate || 0,
+                            billingMonth: tx.billing_month || tx.billingMonth || null,
                             updated_at: tx.updated_at,
                             is_deleted: tx.is_deleted || false
                         });
@@ -1815,6 +1958,22 @@
                             });
                         }
                         console.log(`✅ Pulled ${categories.length} categories from cloud`);
+                    }
+
+                    // 处理信用卡数据
+                    if (creditCards && creditCards.length > 0) {
+                        state.cards = creditCards.map(card => ({
+                            id: card.id,
+                            name: card.name,
+                            closingDay: card.closing_day,
+                            dueDaysAfter: card.due_days_after,
+                            carryingBalance: parseFloat(card.carrying_balance) || 0,
+                            initialBalance: parseFloat(card.initial_balance) || 0,
+                            updated_at: card.updated_at
+                        }));
+                        // 保存到 localStorage
+                        localStorage.setItem('ledger_cards_v13', JSON.stringify(state.cards));
+                        console.log(`✅ Pulled ${creditCards.length} credit cards from cloud`);
                     }
 
                     if (settings) {
@@ -1901,10 +2060,15 @@
                 { name: "帳單雜項", icon: "🧾", color: "#8b5cf6" },
                 { name: "休閒娛樂", icon: "🎮", color: "#ec4899" }
             ],
+            cards: [], // 信用卡列表：{ id, name, closingDay, dueDaysAfter, carryingBalance, initialBalance }
             editingId: null,
             tempCat: "美食餐飲",
             tempCurrency: null,
             tempEmoji: null,
+            tempPaymentMethod: 'cash', // 支付方式：'cash' 或 'credit'
+            tempCardId: null, // 选中的信用卡 ID
+            tempInstallments: 1, // 分期期数，默认1
+            tempInterestRate: 0, // 年利率（%），默认0
             isOnline: navigator.onLine,
             lastSyncTime: null,
             syncError: null
@@ -1934,6 +2098,17 @@
                 const categories = await localDB.getAll('categories');
                 if (categories.length > 0) {
                     state.categories = categories;
+                }
+
+                // 加载信用卡数据
+                const cardsData = localStorage.getItem('ledger_cards_v13');
+                if (cardsData) {
+                    try {
+                        state.cards = JSON.parse(cardsData);
+                    } catch (e) {
+                        console.warn('Failed to parse cards data:', e);
+                        state.cards = [];
+                    }
                 }
 
                 // 載入設定
@@ -2034,6 +2209,14 @@
             state.currency = localStorage.getItem('ledger_currency_v13') || 'TWD';
             state.transactions = JSON.parse(localStorage.getItem('ledger_tx_v13')) || [];
             state.categories = JSON.parse(localStorage.getItem('ledger_cats_v13')) || state.categories;
+            const cardsData = localStorage.getItem('ledger_cards_v13');
+            if (cardsData) {
+                try {
+                    state.cards = JSON.parse(cardsData);
+                } catch (e) {
+                    state.cards = [];
+                }
+            }
         }
 
         // 保存数据到 IndexedDB（本地优先）
@@ -2063,6 +2246,7 @@
                 localStorage.setItem('ledger_theme_id_v13', state.themeId);
                 localStorage.setItem('ledger_currency_v13', state.currency);
                 localStorage.setItem('ledger_cats_v13', JSON.stringify(state.categories));
+                localStorage.setItem('ledger_cards_v13', JSON.stringify(state.cards));
                 localStorage.setItem('ledger_settings_updated_at_v13', now);
                 
                 // 不再自动同步，需要用户手动点击同步按钮
@@ -2075,6 +2259,7 @@
                 localStorage.setItem('ledger_theme_id_v13', state.themeId);
                 localStorage.setItem('ledger_currency_v13', state.currency);
                 localStorage.setItem('ledger_cats_v13', JSON.stringify(state.categories));
+                localStorage.setItem('ledger_cards_v13', JSON.stringify(state.cards));
                 localStorage.setItem('ledger_settings_updated_at_v13', now);
             }
         }
@@ -2783,6 +2968,8 @@
                 lucide.createIcons();
                 updateHUDDate();
                 updateCurrencySymbols();
+                initCardSelectListener(); // 初始化信用卡选择监听器
+                initInstallmentsListener(); // 初始化分期期数监听器
                 const currentMonth = new Date().toISOString().slice(0, 7);
                 document.getElementById('statsMonth').value = currentMonth;
                 document.getElementById('histMonth').value = currentMonth;
@@ -3025,17 +3212,401 @@
 
         function renderAll() { renderHome(); }
 
+        // 计算信用卡缴费日
+        function calculateCreditCardDueDate(transactionDate, card) {
+            if (!card) return null;
+            
+            const txDate = new Date(transactionDate);
+            const txYear = txDate.getFullYear();
+            const txMonth = txDate.getMonth(); // 0-11
+            const txDay = txDate.getDate();
+            
+            const closingDay = card.closingDay;
+            const dueDaysAfter = card.dueDaysAfter;
+            
+            // 判断这笔交易属于哪一期账单
+            // 如果交易日期在结账日之前，属于当月账单；否则属于下月账单
+            let billMonth, billYear;
+            if (txDay <= closingDay) {
+                // 属于当月账单
+                billMonth = txMonth;
+                billYear = txYear;
+            } else {
+                // 属于下月账单
+                billMonth = txMonth + 1;
+                billYear = txYear;
+                if (billMonth > 11) {
+                    billMonth = 0;
+                    billYear += 1;
+                }
+            }
+            
+            // 处理月底边界问题：如果账单月的结账日不存在（如2月31号），则取该月最后一天
+            const lastDayOfBillMonth = new Date(billYear, billMonth + 1, 0).getDate();
+            const actualClosingDay = Math.min(closingDay, lastDayOfBillMonth);
+            
+            // 计算缴费日 = 账单月的实际结账日 + dueDaysAfter
+            let dueDate = new Date(billYear, billMonth, actualClosingDay);
+            dueDate.setDate(dueDate.getDate() + dueDaysAfter);
+            
+            return dueDate;
+        }
+        
+        // 计算首期缴款月份（YYYY-MM格式）
+        function calculateFirstBillingMonth(transactionDate, card) {
+            if (!card) return null;
+            
+            const txDate = new Date(transactionDate);
+            const txYear = txDate.getFullYear();
+            const txMonth = txDate.getMonth(); // 0-11
+            const txDay = txDate.getDate();
+            
+            const closingDay = card.closingDay;
+            
+            // 判断这笔交易属于哪一期账单
+            let billMonth, billYear;
+            if (txDay <= closingDay) {
+                // 属于当月账单
+                billMonth = txMonth;
+                billYear = txYear;
+            } else {
+                // 属于下月账单
+                billMonth = txMonth + 1;
+                billYear = txYear;
+                if (billMonth > 11) {
+                    billMonth = 0;
+                    billYear += 1;
+                }
+            }
+            
+            // 返回 YYYY-MM 格式
+            return `${billYear}-${String(billMonth + 1).padStart(2, '0')}`;
+        }
+        
+        // 计算分期各期的账单月份
+        function calculateInstallmentBillingMonths(firstBillingMonth, installments) {
+            if (!firstBillingMonth || installments <= 1) {
+                return [firstBillingMonth];
+            }
+            
+            const [year, month] = firstBillingMonth.split('-').map(Number);
+            const billingMonths = [];
+            
+            for (let i = 0; i < installments; i++) {
+                let currentYear = year;
+                let currentMonth = month + i;
+                
+                // 处理跨年
+                while (currentMonth > 12) {
+                    currentMonth -= 12;
+                    currentYear += 1;
+                }
+                
+                billingMonths.push(`${currentYear}-${String(currentMonth).padStart(2, '0')}`);
+            }
+            
+            return billingMonths;
+        }
+        
+        // 计算分期每期金额
+        function calculateInstallmentAmounts(totalAmount, installments) {
+            if (installments <= 1) {
+                return [totalAmount];
+            }
+            
+            const perPeriodAmount = Math.floor(totalAmount / installments);
+            const remainder = totalAmount - (perPeriodAmount * installments);
+            
+            const amounts = [];
+            for (let i = 0; i < installments; i++) {
+                // 第一期加上余数
+                amounts.push(i === 0 ? perPeriodAmount + remainder : perPeriodAmount);
+            }
+            
+            return amounts;
+        }
+        
+        // 计算信用卡分期详情（包含利息）
+        function calculateCreditDetails(principal, installments, annualInterestRate) {
+            if (installments <= 1) {
+                return {
+                    principal: principal,
+                    interest: 0,
+                    total: principal,
+                    perPeriodPrincipal: [principal],
+                    perPeriodInterest: 0,
+                    perPeriodTotal: principal
+                };
+            }
+            
+            // 月利率 = 年利率 / 12 / 100
+            const monthlyRate = annualInterestRate / 12 / 100;
+            
+            // 每期本金摊提 = 原始本金 / 总期数
+            const perPeriodPrincipalBase = Math.floor(principal / installments);
+            const principalRemainder = principal - (perPeriodPrincipalBase * installments);
+            
+            // 每期利息 = 原始本金 * 月利率（简单利息计算）
+            const perPeriodInterest = principal * monthlyRate;
+            
+            // 处理除不尽金额：将总本金与计算后的各期本金差额，并入第一期
+            const perPeriodPrincipal = [];
+            for (let i = 0; i < installments; i++) {
+                if (i === 0) {
+                    perPeriodPrincipal.push(perPeriodPrincipalBase + principalRemainder);
+                } else {
+                    perPeriodPrincipal.push(perPeriodPrincipalBase);
+                }
+            }
+            
+            // 每期总金额 = 每期本金 + 每期利息
+            const perPeriodTotal = perPeriodPrincipal[0] + perPeriodInterest;
+            
+            // 总利息 = 每期利息 * 期数
+            const totalInterest = perPeriodInterest * installments;
+            
+            // 总金额 = 本金 + 总利息
+            const totalAmount = principal + totalInterest;
+            
+            return {
+                principal: principal,
+                interest: totalInterest,
+                total: totalAmount,
+                perPeriodPrincipal: perPeriodPrincipal,
+                perPeriodInterest: perPeriodInterest,
+                perPeriodTotal: perPeriodTotal,
+                monthlyRate: monthlyRate
+            };
+        }
+        
+        // 判断信用卡交易是否属于当月的缴费
+        function isCreditCardDueThisMonth(transaction, card) {
+            if (!transaction.paymentMethod || transaction.paymentMethod !== 'credit' || !card) {
+                return false;
+            }
+            
+            const dueDate = calculateCreditCardDueDate(transaction.date, card);
+            if (!dueDate) return false;
+            
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
+            
+            return dueDate.getFullYear() === currentYear && dueDate.getMonth() === currentMonth;
+        }
+        
+        // 判断分期交易的本期金额是否属于当月
+        function isInstallmentDueThisMonth(transaction, card) {
+            if (!transaction.paymentMethod || transaction.paymentMethod !== 'credit' || !card) {
+                return false;
+            }
+            
+            // 如果没有 billingMonth，使用旧逻辑
+            if (!transaction.billingMonth) {
+                return isCreditCardDueThisMonth(transaction, card);
+            }
+            
+            const now = new Date();
+            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            
+            // 检查当前月份是否在分期账单月份列表中
+            const installments = transaction.installments || 1;
+            const firstBillingMonth = transaction.billingMonth;
+            const billingMonths = calculateInstallmentBillingMonths(firstBillingMonth, installments);
+            
+            return billingMonths.includes(currentMonthStr);
+        }
+        
+        // 计算分期交易在本月的应缴金额（返回本金和利息）
+        function getInstallmentAmountThisMonth(transaction) {
+            if (!transaction.billingMonth || !transaction.installments || transaction.installments <= 1) {
+                // 不是分期或旧数据，返回全额（本金），利息为0
+                return {
+                    principal: transaction.amount,
+                    interest: 0,
+                    total: transaction.amount
+                };
+            }
+            
+            const now = new Date();
+            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            
+            const firstBillingMonth = transaction.billingMonth;
+            const billingMonths = calculateInstallmentBillingMonths(firstBillingMonth, transaction.installments);
+            const installmentIndex = billingMonths.indexOf(currentMonthStr);
+            
+            if (installmentIndex === -1) {
+                // 本月不在分期列表中
+                return {
+                    principal: 0,
+                    interest: 0,
+                    total: 0
+                };
+            }
+            
+            // 计算分期详情（包含利息）
+            const interestRate = transaction.interestRate || 0;
+            const details = calculateCreditDetails(transaction.amount, transaction.installments, interestRate);
+            
+            return {
+                principal: details.perPeriodPrincipal[installmentIndex],
+                interest: details.perPeriodInterest,
+                total: details.perPeriodTotal
+            };
+        }
+        
+        // 计算分期交易在指定月份的应缴金额（用于统计页面）
+        function getInstallmentAmountForMonth(transaction, targetMonthStr) {
+            if (!transaction.billingMonth || !transaction.installments || transaction.installments <= 1) {
+                return {
+                    principal: transaction.amount,
+                    interest: 0,
+                    total: transaction.amount
+                };
+            }
+            
+            const firstBillingMonth = transaction.billingMonth;
+            const billingMonths = calculateInstallmentBillingMonths(firstBillingMonth, transaction.installments);
+            const installmentIndex = billingMonths.indexOf(targetMonthStr);
+            
+            if (installmentIndex === -1) {
+                return {
+                    principal: 0,
+                    interest: 0,
+                    total: 0
+                };
+            }
+            
+            const interestRate = transaction.interestRate || 0;
+            const details = calculateCreditDetails(transaction.amount, transaction.installments, interestRate);
+            
+            return {
+                principal: details.perPeriodPrincipal[installmentIndex],
+                interest: details.perPeriodInterest,
+                total: details.perPeriodTotal
+            };
+        }
+        
+        // 计算本月应缴信用卡账单总额（包含分期和结转余额）
+        function calculateCreditCardBillThisMonth() {
+            const now = new Date();
+            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            
+            let totalBill = 0;
+            const cardBills = {}; // 按卡片分组
+            
+            // 遍历所有信用卡交易
+            state.transactions.forEach(tx => {
+                if (tx.paymentMethod === 'credit' && tx.cardId) {
+                    const card = state.cards.find(c => c.id === tx.cardId);
+                    if (!card) return;
+                    
+                    // 计算本期应缴金额（考虑分期和利息）
+                    let principalThisMonth = 0;
+                    let interestThisMonth = 0;
+                    
+                    if (tx.billingMonth && tx.installments && tx.installments > 1) {
+                        // 分期交易：计算本期金额（包含本金和利息）
+                        const installmentDetails = getInstallmentAmountThisMonth(tx);
+                        principalThisMonth = installmentDetails.principal;
+                        interestThisMonth = installmentDetails.interest;
+                    } else {
+                        // 非分期交易：使用旧逻辑判断是否本月到期
+                        if (isCreditCardDueThisMonth(tx, card)) {
+                            principalThisMonth = tx.amount;
+                            interestThisMonth = 0;
+                        }
+                    }
+                    
+                    if (principalThisMonth > 0 || interestThisMonth > 0) {
+                        const txCurrency = tx.currency || state.currency;
+                        const convertedPrincipal = convertCurrency(principalThisMonth, txCurrency, state.currency);
+                        const convertedInterest = convertCurrency(interestThisMonth, txCurrency, state.currency);
+                        const totalAmount = convertedPrincipal + convertedInterest;
+                        
+                        if (!cardBills[tx.cardId]) {
+                            cardBills[tx.cardId] = {
+                                card: card,
+                                amount: 0,
+                                principal: 0,
+                                interest: 0
+                            };
+                        }
+                        cardBills[tx.cardId].amount += totalAmount;
+                        cardBills[tx.cardId].principal += convertedPrincipal;
+                        cardBills[tx.cardId].interest += convertedInterest;
+                    }
+                }
+            });
+            
+            // 加上结转余额和初始欠款
+            state.cards.forEach(card => {
+                const carryingBalance = card.carryingBalance || 0;
+                const initialBalance = card.initialBalance || 0;
+                
+                // 初始欠款：始终计入当前月的应缴账单（因为它是已存在的欠款）
+                if (initialBalance > 0) {
+                    if (!cardBills[card.id]) {
+                        cardBills[card.id] = {
+                            card: card,
+                            amount: 0,
+                            principal: 0,
+                            interest: 0
+                        };
+                    }
+                    // 初始欠款计入应缴总额和利息类别
+                    cardBills[card.id].amount += initialBalance;
+                    cardBills[card.id].interest += initialBalance;
+                }
+                
+                // 加上结转余额
+                if (carryingBalance > 0) {
+                    if (!cardBills[card.id]) {
+                        cardBills[card.id] = {
+                            card: card,
+                            amount: 0,
+                            principal: 0,
+                            interest: 0
+                        };
+                    }
+                    cardBills[card.id].amount += carryingBalance;
+                    // 结转余额计入利息类别
+                    cardBills[card.id].interest += carryingBalance;
+                }
+            });
+            
+            // 计算总额
+            Object.values(cardBills).forEach(bill => {
+                totalBill += bill.amount;
+            });
+            
+            return { total: totalBill, byCard: cardBills };
+        }
+
         function renderHome() {
             const now = new Date();
             const currentMonthStr = now.toISOString().slice(0, 7);
-            const monthFiltered = state.transactions.filter(t => t.date.startsWith(currentMonthStr));
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth(); // 0-11
             
-            // 将所有交易转换为预设币种后计算总支出
-            const totalSpent = monthFiltered.reduce((acc, curr) => {
-                const txCurrency = curr.currency || state.currency; // 相容舊資料
+            // 计算当月现金消费
+            const cashTransactions = state.transactions.filter(t => {
+                const paymentMethod = t.paymentMethod || 'cash'; // 相容舊資料，預設現金
+                return paymentMethod === 'cash' && t.date.startsWith(currentMonthStr);
+            });
+            
+            const cashSpent = cashTransactions.reduce((acc, curr) => {
+                const txCurrency = curr.currency || state.currency;
                 const convertedAmount = convertCurrency(curr.amount, txCurrency, state.currency);
                 return acc + convertedAmount;
             }, 0);
+            
+            // 计算本月应缴信用卡账单（包含分期和结转余额）
+            const creditCardBill = calculateCreditCardBillThisMonth();
+            const creditCardDueThisMonth = creditCardBill.total;
+            
+            // 当月总支出 = 现金消费 + 当月到期的信用卡账单（包含分期本期金额和结转余额）
+            const totalSpent = cashSpent + creditCardDueThisMonth;
             
             const remaining = Math.max(0, state.budget - totalSpent);
             const percent = state.budget > 0 ? (remaining / state.budget) * 100 : 0;
@@ -3047,6 +3618,26 @@
             document.getElementById('displaySpent').innerHTML = `${symbol}${Math.round(totalSpent).toLocaleString()}`;
             // 显示总预算
             document.getElementById('displayBudgetLimit').innerHTML = `${symbol}${state.budget.toLocaleString()}`;
+            
+            // 显示本月待缴信用卡费（如果存在）
+            const creditCardDueEl = document.getElementById('creditCardDueDisplay');
+            if (creditCardDueEl) {
+                if (creditCardDueThisMonth > 0) {
+                    // 检查是否可用现金小于应缴总额（警示）
+                    const availableCash = state.budget - cashSpent;
+                    const isWarning = availableCash < creditCardDueThisMonth;
+                    
+                    creditCardDueEl.innerHTML = `
+                        <div class="text-center mt-4 p-4 ${isWarning ? 'bg-red-500/10 border-red-500/30' : 'bg-yellow-500/10 border-yellow-500/30'} border rounded-2xl">
+                            <div class="text-[9px] font-bold ${isWarning ? 'text-red-400/80' : 'text-yellow-400/80'} uppercase tracking-wider mb-1">本月待繳信用卡費</div>
+                            <div class="text-lg font-black ${isWarning ? 'text-red-400' : 'text-yellow-400'}">${symbol}${Math.round(creditCardDueThisMonth).toLocaleString()}</div>
+                            ${isWarning ? `<div class="text-[8px] text-red-400/60 mt-1">⚠️ 可用現金不足</div>` : ''}
+                        </div>
+                    `;
+                } else {
+                    creditCardDueEl.innerHTML = '';
+                }
+            }
             
             const liquidEl = document.getElementById('liquidLevel');
             liquidEl.style.height = percent + '%';
@@ -3102,12 +3693,43 @@
             document.getElementById('recentList').innerHTML = recent.length ? recent.map(t => {
                 const txCurrency = t.currency || state.currency;
                 const txSymbol = CURRENCY_OPTIONS.find(c => c.id === txCurrency)?.symbol || symbol;
+                // 获取信用卡名称和分期信息（如果是信用卡消费）
+                let cardName = '';
+                let installmentLabel = '';
+                let interestLabel = '';
+                if (t.paymentMethod === 'credit' && t.cardId) {
+                    const card = state.cards.find(c => c.id === t.cardId);
+                    if (card) {
+                        cardName = ` 💳 ${card.name}`;
+                        // 显示分期标签
+                        if (t.installments && t.installments > 1) {
+                            // 计算当前是第几期
+                            const now = new Date();
+                            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                            if (t.billingMonth) {
+                                const billingMonths = calculateInstallmentBillingMonths(t.billingMonth, t.installments);
+                                const currentIndex = billingMonths.indexOf(currentMonthStr);
+                                if (currentIndex !== -1) {
+                                    installmentLabel = ` (${currentIndex + 1}/${t.installments} 期)`;
+                                    
+                                    // 显示利息标注
+                                    if (t.interestRate && t.interestRate > 0) {
+                                        const details = calculateCreditDetails(t.amount, t.installments, t.interestRate);
+                                        interestLabel = ` 💰${txSymbol}${Math.round(details.perPeriodInterest).toLocaleString()}`;
+                                    }
+                                } else {
+                                    installmentLabel = ` (${t.installments} 期)`;
+                                }
+                            }
+                        }
+                    }
+                }
                 return `
                 <div onclick="editTx(${t.id})" class="glass-panel p-4 flex justify-between items-center rounded-2xl active:scale-95 transition-transform cursor-pointer">
                     <div class="flex items-center gap-3">
                         <span class="text-xl">${t.icon}</span>
                         <div>
-                            <div class="text-[11px] font-bold text-white">${t.note || t.category}</div>
+                            <div class="text-[11px] font-bold text-white">${t.note || t.category}${cardName}${installmentLabel}${interestLabel}</div>
                             <div class="text-[8px] font-black text-white/20 uppercase">${t.date}</div>
                         </div>
                     </div>
@@ -3115,6 +3737,102 @@
                 </div>
                 `;
             }).join('') : '<div class="text-center py-4 text-white/10 text-xs uppercase tracking-widest">No activities</div>';
+            
+            // 显示未来预定支出预览
+            renderFutureExpensesPreview();
+        }
+        
+        // 渲染未来预定支出预览
+        function renderFutureExpensesPreview() {
+            const now = new Date();
+            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const futureMonths = [];
+            
+            // 计算未来3个月
+            for (let i = 1; i <= 3; i++) {
+                let year = now.getFullYear();
+                let month = now.getMonth() + i;
+                while (month > 12) {
+                    month -= 12;
+                    year += 1;
+                }
+                futureMonths.push(`${year}-${String(month).padStart(2, '0')}`);
+            }
+            
+            // 计算每个月的信用卡应缴金额（包含分期和单笔）
+            const futureExpenses = {};
+            futureMonths.forEach(monthStr => {
+                futureExpenses[monthStr] = 0;
+            });
+            
+            state.transactions.forEach(tx => {
+                if (tx.paymentMethod === 'credit' && tx.cardId) {
+                    const card = state.cards.find(c => c.id === tx.cardId);
+                    if (!card) return;
+                    
+                    if (tx.billingMonth && tx.installments && tx.installments > 1) {
+                        // 分期交易：计算每期金额（含利息）
+                        const billingMonths = calculateInstallmentBillingMonths(tx.billingMonth, tx.installments);
+                        const details = calculateCreditDetails(tx.amount, tx.installments, tx.interestRate || 0);
+                        
+                        billingMonths.forEach((billMonth, index) => {
+                            if (futureExpenses.hasOwnProperty(billMonth)) {
+                                const txCurrency = tx.currency || state.currency;
+                                const principalAmount = details.perPeriodPrincipal[index];
+                                const interestAmount = details.perPeriodInterest;
+                                const totalAmount = principalAmount + interestAmount;
+                                const convertedAmount = convertCurrency(totalAmount, txCurrency, state.currency);
+                                futureExpenses[billMonth] += convertedAmount;
+                            }
+                        });
+                    } else {
+                        // 单笔交易：计算缴款月份
+                        const dueDate = calculateCreditCardDueDate(tx.date, card);
+                        if (dueDate) {
+                            const dueYear = dueDate.getFullYear();
+                            const dueMonth = dueDate.getMonth() + 1;
+                            const dueMonthStr = `${dueYear}-${String(dueMonth).padStart(2, '0')}`;
+                            
+                            if (futureExpenses.hasOwnProperty(dueMonthStr)) {
+                                const txCurrency = tx.currency || state.currency;
+                                const convertedAmount = convertCurrency(tx.amount, txCurrency, state.currency);
+                                futureExpenses[dueMonthStr] += convertedAmount;
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 渲染UI
+            const previewEl = document.getElementById('futureExpensesPreview');
+            if (previewEl) {
+                const hasFutureExpenses = Object.values(futureExpenses).some(amount => amount > 0);
+                
+                if (hasFutureExpenses) {
+                    const symbol = getCurrencySymbol();
+                    previewEl.innerHTML = `
+                        <div class="glass-panel p-4 rounded-2xl mt-6">
+                            <h3 class="text-[10px] font-black uppercase text-white/30 tracking-widest mb-3">未來預定支出</h3>
+                            <div class="space-y-2">
+                                ${futureMonths.map(monthStr => {
+                                    const amount = futureExpenses[monthStr];
+                                    if (amount <= 0) return '';
+                                    const [year, month] = monthStr.split('-');
+                                    const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
+                                    return `
+                                        <div class="flex justify-between items-center text-[10px]">
+                                            <span class="text-white/60">${year}年${monthNames[parseInt(month) - 1]}</span>
+                                            <span class="text-white font-bold">${symbol}${Math.round(amount).toLocaleString()}</span>
+                                        </div>
+                                    `;
+                                }).filter(html => html).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    previewEl.innerHTML = '';
+                }
+            }
         }
 
         function renderHistory(filterCategory = null) {
@@ -3165,7 +3883,30 @@
                                 const txSymbol = CURRENCY_OPTIONS.find(c => c.id === txCurrency)?.symbol || symbol;
                                 return `
                                 <div onclick="event.stopPropagation(); editTx(${t.id})" class="history-item-row flex justify-between items-center p-3 bg-white/[0.03] rounded-xl cursor-pointer">
-                                    <div class="flex items-center gap-3"><span class="text-base">${t.icon}</span><span class="text-[11px] font-bold text-white/70">${t.note || t.category}</span></div>
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-base">${t.icon}</span>
+                                        <span class="text-[11px] font-bold text-white/70">
+                                            ${t.note || t.category}${t.paymentMethod === 'credit' && t.cardId ? (() => { 
+                                                const card = state.cards.find(c => c.id === t.cardId); 
+                                                if (!card) return '';
+                                                let label = ` 💳 ${card.name}`;
+                                                if (t.installments && t.installments > 1) {
+                                                    const now = new Date();
+                                                    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                                                    if (t.billingMonth) {
+                                                        const billingMonths = calculateInstallmentBillingMonths(t.billingMonth, t.installments);
+                                                        const currentIndex = billingMonths.indexOf(currentMonthStr);
+                                                        if (currentIndex !== -1) {
+                                                            label += ` (${currentIndex + 1}/${t.installments} 期)`;
+                                                        } else {
+                                                            label += ` (${t.installments} 期)`;
+                                                        }
+                                                    }
+                                                }
+                                                return label;
+                                            })() : ''}
+                                        </span>
+                                    </div>
                                     <span class="text-xs font-bold text-white">-${txSymbol}${t.amount.toLocaleString()}</span>
                                 </div>
                                 `;
@@ -3181,18 +3922,104 @@
 
         function renderStats() {
             const month = document.getElementById('statsMonth').value;
+            const [year, monthNum] = month.split('-').map(Number);
+            const currentMonthStr = `${year}-${String(monthNum).padStart(2, '0')}`;
             const dataMap = {};
             let total = 0;
-            state.transactions.filter(t => t.date.startsWith(month)).forEach(t => {
-                // 转换为预设币种后统计
+            
+            // 1. 统计现金消费（原类别）
+            state.transactions.filter(t => {
+                const paymentMethod = t.paymentMethod || 'cash';
+                return paymentMethod === 'cash' && t.date.startsWith(month);
+            }).forEach(t => {
                 const txCurrency = t.currency || state.currency;
                 const convertedAmount = convertCurrency(t.amount, txCurrency, state.currency);
                 dataMap[t.category] = (dataMap[t.category] || 0) + convertedAmount;
                 total += convertedAmount;
             });
+            
+            // 2. 统计信用卡当月应摊提之本金（原类别）
+            state.transactions.forEach(tx => {
+                if (tx.paymentMethod === 'credit' && tx.cardId) {
+                    const card = state.cards.find(c => c.id === tx.cardId);
+                    if (!card) return;
+                    
+                    let principalThisMonth = 0;
+                    
+                    if (tx.billingMonth && tx.installments && tx.installments > 1) {
+                        // 分期交易：计算指定月份的本期本金
+                        const installmentDetails = getInstallmentAmountForMonth(tx, currentMonthStr);
+                        principalThisMonth = installmentDetails.principal;
+                    } else {
+                        // 非分期交易：判断是否在指定月份到期
+                        const dueDate = calculateCreditCardDueDate(tx.date, card);
+                        if (dueDate) {
+                            const dueYear = dueDate.getFullYear();
+                            const dueMonth = dueDate.getMonth() + 1;
+                            const dueMonthStr = `${dueYear}-${String(dueMonth).padStart(2, '0')}`;
+                            if (dueMonthStr === currentMonthStr) {
+                                principalThisMonth = tx.amount;
+                            }
+                        }
+                    }
+                    
+                    if (principalThisMonth > 0) {
+                        const txCurrency = tx.currency || state.currency;
+                        const convertedAmount = convertCurrency(principalThisMonth, txCurrency, state.currency);
+                        // 本金计入原类别
+                        dataMap[tx.category] = (dataMap[tx.category] || 0) + convertedAmount;
+                        total += convertedAmount;
+                    }
+                }
+            });
+            
+            // 3. 统计信用卡利息与结转余额（新增类别：'利息与欠款'）
+            let interestAndCarryOver = 0;
+            
+            // 3.1 统计分期利息
+            state.transactions.forEach(tx => {
+                if (tx.paymentMethod === 'credit' && tx.cardId && tx.billingMonth && tx.installments && tx.installments > 1) {
+                    const installmentDetails = getInstallmentAmountForMonth(tx, currentMonthStr);
+                    if (installmentDetails.interest > 0) {
+                        const txCurrency = tx.currency || state.currency;
+                        const convertedInterest = convertCurrency(installmentDetails.interest, txCurrency, state.currency);
+                        interestAndCarryOver += convertedInterest;
+                    }
+                }
+            });
+            
+            // 3.2 统计结转余额和初始欠款
+            // 初始欠款：始终计入当前月（因为它是已存在的欠款）
+            // 结转余额：只在查看当前月时计入
+            const isCurrentMonth = month === new Date().toISOString().slice(0, 7);
+            
+            state.cards.forEach(card => {
+                const initialBalance = card.initialBalance || 0;
+                const carryingBalance = card.carryingBalance || 0;
+                
+                // 初始欠款：始终计入统计月份
+                if (isCurrentMonth && initialBalance > 0) {
+                    interestAndCarryOver += initialBalance;
+                }
+                
+                // 结转余额：只在查看当前月时计入
+                if (isCurrentMonth && carryingBalance > 0) {
+                    interestAndCarryOver += carryingBalance;
+                }
+            });
+            
+            if (interestAndCarryOver > 0) {
+                dataMap['利息与欠款'] = (dataMap['利息与欠款'] || 0) + interestAndCarryOver;
+                total += interestAndCarryOver;
+            }
             const labels = Object.keys(dataMap);
             const values = Object.values(dataMap);
-            const colors = labels.map(l => state.categories.find(c => c.name === l)?.color || '#555');
+            const colors = labels.map(l => {
+                if (l === '利息与欠款') {
+                    return '#ef4444'; // 红色表示利息与欠款
+                }
+                return state.categories.find(c => c.name === l)?.color || '#555';
+            });
             const chartEl = document.getElementById('mainChart');
             const noDataEl = document.getElementById('noDataStats');
             if(total === 0) {
@@ -3274,9 +4101,10 @@
             });
             const symbol = getCurrencySymbol();
             document.getElementById('statsLegend').innerHTML = Object.entries(dataMap).sort((a,b)=>b[1]-a[1]).map(([name, val]) => {
-                const cat = state.categories.find(c => c.name === name);
+                // 为"利息与欠款"类别使用特殊图标
+                const icon = name === '利息与欠款' ? '💰' : (state.categories.find(c => c.name === name)?.icon || '❓');
                 return `<div class="stats-item-card glass-panel p-4 rounded-2xl flex justify-between items-center" onclick="nav('history'); document.getElementById('histMonth').value='${month}'; renderHistory('${name}')">
-                    <div class="flex items-center gap-3"><span>${cat?.icon || '❓'}</span><span class="text-xs font-bold">${name}</span></div>
+                    <div class="flex items-center gap-3"><span>${icon}</span><span class="text-xs font-bold">${name}</span></div>
                     <span class="text-xs font-black">${symbol}${Math.round(val).toLocaleString()}</span>
                 </div>`;
             }).join('');
@@ -3286,12 +4114,17 @@
             state.editingId = null; 
             state.tempCat = state.categories[0].name;
             state.tempCurrency = state.currency; // 預設使用使用者設定的幣種
+            state.tempPaymentMethod = 'cash'; // 預設現金
+            state.tempCardId = null;
+            state.tempInstallments = 1; // 預設1期
             document.getElementById('formAmount').value = ""; 
             document.getElementById('formNote').value = "";
             document.getElementById('formDate').value = new Date().toISOString().slice(0, 10);
+            document.getElementById('formInstallments').value = "1";
             document.getElementById('deleteBtn').classList.add('hidden');
             renderFormCurrencyGrid();
-            renderFormCatGrid(); 
+            renderFormCatGrid();
+            renderPaymentMethod();
             nav('add');
         }
 
@@ -3301,13 +4134,138 @@
             state.editingId = id; 
             state.tempCat = tx.category;
             state.tempCurrency = tx.currency || state.currency; // 相容舊資料
+            state.tempPaymentMethod = tx.paymentMethod || 'cash'; // 相容舊資料，預設現金
+            state.tempCardId = tx.cardId || null;
+            state.tempInstallments = tx.installments || 1; // 相容舊資料，預設1期
             document.getElementById('formAmount').value = tx.amount;
             document.getElementById('formNote').value = tx.note;
             document.getElementById('formDate').value = tx.date;
+            document.getElementById('formInstallments').value = state.tempInstallments;
             document.getElementById('deleteBtn').classList.remove('hidden');
             renderFormCurrencyGrid();
-            renderFormCatGrid(); 
+            renderFormCatGrid();
+            renderPaymentMethod();
             nav('add');
+        }
+        
+        function renderPaymentMethod() {
+            // 更新支付方式按钮状态
+            const cashBtn = document.getElementById('paymentCashBtn');
+            const creditBtn = document.getElementById('paymentCreditBtn');
+            const cardSelectContainer = document.getElementById('cardSelectContainer');
+            const cardSelect = document.getElementById('cardSelect');
+            
+            if (state.tempPaymentMethod === 'cash') {
+                cashBtn.className = 'flex-1 py-4 dynamic-accent-bg text-black rounded-2xl font-black';
+                creditBtn.className = 'flex-1 py-4 glass-panel rounded-2xl font-bold text-white/50';
+                cardSelectContainer.classList.add('hidden');
+            } else {
+                cashBtn.className = 'flex-1 py-4 glass-panel rounded-2xl font-bold text-white/50';
+                creditBtn.className = 'flex-1 py-4 dynamic-accent-bg text-black rounded-2xl font-black';
+                
+                // 如果没有信用卡，提示用户先添加
+                if (state.cards.length === 0) {
+                    cardSelectContainer.classList.remove('hidden');
+                    cardSelect.innerHTML = '<option value="">請先在設定中新增信用卡</option>';
+                    cardSelect.disabled = true;
+                } else {
+                    cardSelectContainer.classList.remove('hidden');
+                    cardSelect.disabled = false;
+                    // 更新信用卡下拉菜单
+                    cardSelect.innerHTML = '<option value="">請選擇信用卡</option>' + 
+                        state.cards.map(card => 
+                            `<option value="${card.id}" ${state.tempCardId === card.id ? 'selected' : ''}>${card.name}</option>`
+                        ).join('');
+                    
+                    // 更新分期期数输入框
+                    const installmentsInput = document.getElementById('formInstallments');
+                    if (installmentsInput) {
+                        installmentsInput.value = state.tempInstallments || 1;
+                    }
+                }
+            }
+        }
+        
+        // 监听分期期数和利率变化，即时试算
+        function initInstallmentsListener() {
+            const installmentsInput = document.getElementById('formInstallments');
+            const interestRateInput = document.getElementById('formInterestRate');
+            const amountInput = document.getElementById('formAmount');
+            
+            const updateInstallmentPreview = () => {
+                const amount = parseFloat(amountInput.value) || 0;
+                const installments = parseInt(installmentsInput.value) || 1;
+                const interestRate = parseFloat(interestRateInput.value) || 0;
+                
+                if (amount > 0 && installments > 1 && state.tempPaymentMethod === 'credit') {
+                    const details = calculateCreditDetails(amount, installments, interestRate);
+                    const symbol = getCurrencySymbol();
+                    const previewEl = document.getElementById('installmentPreview');
+                    const displayEl = document.getElementById('installmentAmountDisplay');
+                    
+                    if (previewEl && displayEl) {
+                        previewEl.classList.remove('hidden');
+                        displayEl.innerHTML = `
+                            <div class="text-xs mb-1">每期：${symbol}${Math.round(details.perPeriodTotal).toLocaleString()}</div>
+                            <div class="text-[9px] text-blue-400/60">本金：${symbol}${Math.round(details.perPeriodPrincipal[0]).toLocaleString()} | 利息：${symbol}${Math.round(details.perPeriodInterest).toLocaleString()}</div>
+                            <div class="text-[9px] text-blue-400/60 mt-1">總計：${symbol}${Math.round(details.total).toLocaleString()}（含利息 ${symbol}${Math.round(details.interest).toLocaleString()}）</div>
+                        `;
+                    }
+                } else {
+                    const previewEl = document.getElementById('installmentPreview');
+                    if (previewEl) {
+                        previewEl.classList.add('hidden');
+                    }
+                }
+            };
+            
+            if (installmentsInput) {
+                installmentsInput.addEventListener('change', (e) => {
+                    const value = parseInt(e.target.value) || 1;
+                    state.tempInstallments = Math.max(1, Math.min(24, value));
+                    e.target.value = state.tempInstallments;
+                    updateInstallmentPreview();
+                });
+            }
+            
+            if (interestRateInput) {
+                interestRateInput.addEventListener('change', (e) => {
+                    const value = parseFloat(e.target.value) || 0;
+                    state.tempInterestRate = Math.max(0, Math.min(100, value));
+                    e.target.value = state.tempInterestRate;
+                    updateInstallmentPreview();
+                });
+            }
+            
+            if (amountInput) {
+                amountInput.addEventListener('input', updateInstallmentPreview);
+            }
+        }
+        
+        function selectPaymentMethod(method) {
+            if (method === 'credit' && state.cards.length === 0) {
+                alert('請先在設定中新增信用卡');
+                return;
+            }
+            state.tempPaymentMethod = method;
+            if (method === 'cash') {
+                state.tempCardId = null;
+            }
+            renderPaymentMethod();
+        }
+        
+        // 初始化信用卡选择下拉菜单事件监听（在 window.onload 中调用）
+        function initCardSelectListener() {
+            const cardSelect = document.getElementById('cardSelect');
+            if (cardSelect) {
+                // 移除旧的监听器（如果存在）
+                const newCardSelect = cardSelect.cloneNode(true);
+                cardSelect.parentNode.replaceChild(newCardSelect, cardSelect);
+                // 添加新的监听器
+                document.getElementById('cardSelect').addEventListener('change', (e) => {
+                    state.tempCardId = e.target.value || null;
+                });
+            }
         }
 
         function renderFormCurrencyGrid() {
@@ -3341,6 +4299,22 @@
             const date = document.getElementById('formDate').value;
             if(!amt || !date) return;
             const catObj = state.categories.find(c => c.name === state.tempCat);
+            
+            // 获取分期期数和年利率
+            const installments = parseInt(document.getElementById('formInstallments').value) || 1;
+            const installmentsValue = Math.max(1, Math.min(24, installments));
+            const interestRate = parseFloat(document.getElementById('formInterestRate').value) || 0;
+            const interestRateValue = Math.max(0, Math.min(100, interestRate));
+            
+            // 计算首期账单月份（如果是信用卡消费）
+            let billingMonth = null;
+            if (state.tempPaymentMethod === 'credit' && state.tempCardId) {
+                const card = state.cards.find(c => c.id === state.tempCardId);
+                if (card) {
+                    billingMonth = calculateFirstBillingMonth(date, card);
+                }
+            }
+            
             const data = { 
                 id: state.editingId || Date.now(), 
                 amount: amt, 
@@ -3349,6 +4323,11 @@
                 note: document.getElementById('formNote').value, 
                 category: state.tempCat, 
                 icon: catObj.icon,
+                paymentMethod: state.tempPaymentMethod || 'cash', // 支付方式，預設現金（相容舊資料）
+                cardId: state.tempPaymentMethod === 'credit' ? state.tempCardId : null, // 信用卡 ID
+                installments: installmentsValue, // 分期期数，預設1（相容舊資料）
+                interestRate: interestRateValue, // 年利率（%），預設0（相容舊資料）
+                billingMonth: billingMonth, // 首期账单月份（YYYY-MM）
                 updated_at: new Date().toISOString(),
                 is_deleted: false  // 确保新记录标记为未删除
             };
@@ -3433,6 +4412,54 @@
                 </button>
             `).join('');
             document.getElementById('settingsCatList').innerHTML = state.categories.map(c => `<div class="flex justify-between p-3 bg-white/5 rounded-xl"><span>${c.icon} ${c.name}</span><button onclick="deleteCat('${c.name}')"><i data-lucide="trash-2" class="w-3 h-3 text-white/20"></i></button></div>`).join('');
+            
+            // 渲染信用卡列表
+            const creditCardBill = calculateCreditCardBillThisMonth();
+            document.getElementById('settingsCardList').innerHTML = state.cards.length > 0 
+                ? state.cards.map(card => {
+                    const cardBill = creditCardBill.byCard[card.id];
+                    const billAmount = cardBill ? cardBill.amount : 0;
+                    const carryingBalance = card.carryingBalance || 0;
+                    const initialBalance = card.initialBalance || 0;
+                    const symbol = getCurrencySymbol();
+                    
+                    // 检查该卡片在当前月是否有应缴的交易
+                    const hasTransactionsThisMonth = state.transactions.some(tx => {
+                        if (tx.paymentMethod === 'credit' && tx.cardId === card.id) {
+                            if (tx.billingMonth && tx.installments && tx.installments > 1) {
+                                const installmentDetails = getInstallmentAmountThisMonth(tx);
+                                return installmentDetails.total > 0;
+                            } else {
+                                return isCreditCardDueThisMonth(tx, card);
+                            }
+                        }
+                        return false;
+                    });
+                    
+                    return `
+                    <div class="p-3 bg-white/5 rounded-xl space-y-2">
+                        <div class="flex justify-between items-center">
+                            <div class="flex-1">
+                                <div class="text-[11px] font-bold text-white">💳 ${card.name}</div>
+                                <div class="text-[9px] text-white/40">結帳日：每月 ${card.closingDay} 號 | 繳款日：結帳後 ${card.dueDaysAfter} 天</div>
+                                ${initialBalance > 0 && !hasTransactionsThisMonth ? `<div class="text-[9px] text-orange-400 mt-1">初始欠款：${symbol}${Math.round(initialBalance).toLocaleString()}</div>` : ''}
+                                ${carryingBalance > 0 ? `<div class="text-[9px] text-yellow-400 mt-1">上期結轉：${symbol}${Math.round(carryingBalance).toLocaleString()}</div>` : ''}
+                                ${billAmount > 0 ? `<div class="text-[9px] text-yellow-400 mt-1">本月應繳：${symbol}${Math.round(billAmount).toLocaleString()}</div>` : ''}
+                            </div>
+                            <div class="flex gap-2">
+                                ${billAmount > 0 ? `<button onclick="openPaymentModal('${card.id}')" class="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-lg text-[9px] font-bold">還款</button>` : ''}
+                                <button onclick="editCard('${card.id}')" class="p-2 bg-white/10 rounded-lg">
+                                    <i data-lucide="edit" class="w-3 h-3 text-white/60"></i>
+                                </button>
+                                <button onclick="deleteCard('${card.id}')" class="p-2 bg-white/10 rounded-lg">
+                                    <i data-lucide="trash-2" class="w-3 h-3 text-white/20"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                }).join('')
+                : '<div class="text-center py-4 text-white/20 text-xs">尚未新增信用卡</div>';
             
             // 更新登入狀態显示
             updateAuthUI();
@@ -3522,6 +4549,184 @@
         }
 
         function closeCatModal() { document.getElementById('catModal').classList.add('hidden'); }
+        
+        // 信用卡管理函数
+        let editingCardId = null;
+        
+        function openCardModal(cardId = null) {
+            editingCardId = cardId;
+            const modal = document.getElementById('cardModal');
+            const title = document.getElementById('cardModalTitle');
+            const nameInput = document.getElementById('cardName');
+            const closingDayInput = document.getElementById('cardClosingDay');
+            const dueDaysInput = document.getElementById('cardDueDays');
+            const initialBalanceInput = document.getElementById('cardInitialBalance');
+            
+            if (cardId) {
+                // 编辑模式
+                const card = state.cards.find(c => c.id === cardId);
+                if (card) {
+                    title.innerText = '編輯信用卡';
+                    nameInput.value = card.name;
+                    closingDayInput.value = card.closingDay;
+                    dueDaysInput.value = card.dueDaysAfter;
+                    initialBalanceInput.value = card.initialBalance || 0;
+                }
+            } else {
+                // 新增模式
+                title.innerText = '新增信用卡';
+                nameInput.value = '';
+                closingDayInput.value = '';
+                dueDaysInput.value = '';
+                initialBalanceInput.value = '';
+            }
+            
+            modal.classList.remove('hidden');
+        }
+        
+        function closeCardModal() {
+            document.getElementById('cardModal').classList.add('hidden');
+            editingCardId = null;
+        }
+        
+        async function confirmAddCard() {
+            const name = document.getElementById('cardName').value.trim();
+            const closingDay = parseInt(document.getElementById('cardClosingDay').value);
+            const dueDays = parseInt(document.getElementById('cardDueDays').value);
+            const initialBalance = parseFloat(document.getElementById('cardInitialBalance').value) || 0;
+            
+            if (!name || !closingDay || !dueDays) {
+                alert('請填寫完整資訊');
+                return;
+            }
+            
+            if (closingDay < 1 || closingDay > 31) {
+                alert('結帳日必須在 1-31 之間');
+                return;
+            }
+            
+            if (dueDays < 1 || dueDays > 60) {
+                alert('繳款天數必須在 1-60 之間');
+                return;
+            }
+            
+            if (initialBalance < 0) {
+                alert('初始未繳清餘額不能為負數');
+                return;
+            }
+            
+            if (editingCardId) {
+                // 编辑（保留原有的 carryingBalance）
+                const idx = state.cards.findIndex(c => c.id === editingCardId);
+                if (idx !== -1) {
+                    const existingCard = state.cards[idx];
+                    state.cards[idx] = {
+                        id: editingCardId,
+                        name,
+                        closingDay,
+                        dueDaysAfter: dueDays,
+                        carryingBalance: existingCard.carryingBalance || 0, // 保留结转余额
+                        initialBalance: initialBalance // 更新初始欠款
+                    };
+                }
+            } else {
+                // 新增
+                const newCard = {
+                    id: Date.now().toString(),
+                    name,
+                    closingDay,
+                    dueDaysAfter: dueDays,
+                    carryingBalance: 0, // 初始结转余额为0
+                    initialBalance: initialBalance // 初始未繳清餘額
+                };
+                state.cards.push(newCard);
+            }
+            
+            await save();
+            renderSettings();
+            renderHome(); // 重新渲染首页以更新预算计算
+            closeCardModal();
+        }
+        
+        function editCard(cardId) {
+            openCardModal(cardId);
+        }
+        
+        async function deleteCard(cardId) {
+            if (!confirm('確定要刪除此信用卡嗎？')) return;
+            
+            state.cards = state.cards.filter(c => c.id !== cardId);
+            await save();
+            renderSettings();
+        }
+        
+        // 还款功能
+        let paymentCardId = null;
+        
+        function openPaymentModal(cardId) {
+            paymentCardId = cardId;
+            const card = state.cards.find(c => c.id === cardId);
+            if (!card) return;
+            
+            const creditCardBill = calculateCreditCardBillThisMonth();
+            const cardBill = creditCardBill.byCard[cardId];
+            const billAmount = cardBill ? cardBill.amount : 0;
+            const symbol = getCurrencySymbol();
+            
+            document.getElementById('paymentModalTitle').innerText = `記錄還款 - ${card.name}`;
+            document.getElementById('paymentCardInfo').innerHTML = `💳 ${card.name}`;
+            document.getElementById('paymentTotalAmount').innerText = `${symbol}${Math.round(billAmount).toLocaleString()}`;
+            document.getElementById('paymentAmount').value = '';
+            
+            document.getElementById('paymentModal').classList.remove('hidden');
+        }
+        
+        function closePaymentModal() {
+            document.getElementById('paymentModal').classList.add('hidden');
+            paymentCardId = null;
+        }
+        
+        async function confirmPayment() {
+            if (!paymentCardId) return;
+            
+            const paymentAmount = parseFloat(document.getElementById('paymentAmount').value);
+            if (!paymentAmount || paymentAmount <= 0) {
+                alert('請輸入有效的還款金額');
+                return;
+            }
+            
+            const card = state.cards.find(c => c.id === paymentCardId);
+            if (!card) return;
+            
+            const creditCardBill = calculateCreditCardBillThisMonth();
+            const cardBill = creditCardBill.byCard[paymentCardId];
+            const billAmount = cardBill ? cardBill.amount : 0;
+            
+            // 计算剩余未缴金额
+            const remaining = billAmount - paymentAmount;
+            
+            const cardIndex = state.cards.findIndex(c => c.id === paymentCardId);
+            if (cardIndex !== -1) {
+                if (remaining > 0) {
+                    // 有剩余，更新结转余额（累加到下月）
+                    state.cards[cardIndex].carryingBalance = remaining;
+                } else {
+                    // 已缴清，清零结转余额
+                    state.cards[cardIndex].carryingBalance = 0;
+                }
+            }
+            
+            await save();
+            renderSettings();
+            renderHome();
+            closePaymentModal();
+            
+            if (remaining > 0) {
+                alert(`已還款 ${paymentAmount.toLocaleString()}，剩餘 ${remaining.toLocaleString()} 將結轉至下月`);
+            } else {
+                alert('已還款完成！');
+            }
+        }
         
         function showCloudInfoModal() { 
             document.getElementById('cloudInfoModal').classList.remove('hidden'); 

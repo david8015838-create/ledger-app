@@ -19,6 +19,25 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     category TEXT NOT NULL,
     icon TEXT NOT NULL,
     currency TEXT DEFAULT 'TWD',
+    payment_method TEXT DEFAULT 'cash',
+    card_id TEXT,
+    installments INTEGER DEFAULT 1,
+    interest_rate NUMERIC(5, 2) DEFAULT 0,
+    billing_month TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    is_deleted BOOLEAN DEFAULT FALSE
+);
+
+-- 3.5 创建信用卡表 (credit_cards)
+CREATE TABLE IF NOT EXISTS public.credit_cards (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    closing_day INTEGER NOT NULL CHECK (closing_day >= 1 AND closing_day <= 31),
+    due_days_after INTEGER NOT NULL CHECK (due_days_after >= 1 AND due_days_after <= 60),
+    carrying_balance NUMERIC(10, 2) DEFAULT 0,
+    initial_balance NUMERIC(10, 2) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     is_deleted BOOLEAN DEFAULT FALSE
@@ -64,6 +83,7 @@ CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON public.transactions(user_
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON public.transactions(date DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_updated_at ON public.transactions(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_categories_user_id ON public.categories(user_id);
+CREATE INDEX IF NOT EXISTS idx_credit_cards_user_id ON public.credit_cards(user_id);
 
 -- 7. 创建触发器函数：自动更新 updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -90,6 +110,12 @@ CREATE TRIGGER update_categories_updated_at
 DROP TRIGGER IF EXISTS update_user_settings_updated_at ON public.user_settings;
 CREATE TRIGGER update_user_settings_updated_at
     BEFORE UPDATE ON public.user_settings
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_credit_cards_updated_at ON public.credit_cards;
+CREATE TRIGGER update_credit_cards_updated_at
+    BEFORE UPDATE ON public.credit_cards
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
@@ -153,6 +179,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.credit_cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.login_codes ENABLE ROW LEVEL SECURITY;
 
 -- 12. 删除旧的策略（如果存在）
@@ -219,6 +246,24 @@ CREATE POLICY "Users can update own settings"
     ON public.user_settings FOR UPDATE
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
+
+-- 15.3 创建 RLS 策略：Credit Cards 表
+CREATE POLICY "Users can view own credit cards"
+    ON public.credit_cards FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own credit cards"
+    ON public.credit_cards FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own credit cards"
+    ON public.credit_cards FOR UPDATE
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own credit cards"
+    ON public.credit_cards FOR DELETE
+    USING (auth.uid() = user_id);
 
 -- 15.5 创建 RLS 策略：Login Codes 表
 -- 注意：login_codes 表需要特殊的策略，因为验证时用户可能未登录
