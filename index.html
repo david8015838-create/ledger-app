@@ -2408,8 +2408,11 @@
                 // 3. 初始化 Supabase 并处理 Magic Link
                 if (supabaseClient) {
                     // 设置 auth 状态变化监听器
+                    // 标记是否正在处理 Magic Link 回调
+                    let isProcessingMagicLink = false;
+                    
                     supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                        console.log('🔐 Auth state changed:', event);
+                        console.log('🔐 Auth state changed:', event, session?.user?.email || 'no user');
                         
                         if (event === 'SIGNED_IN' && session) {
                             currentUser = session.user;
@@ -2420,6 +2423,11 @@
                             // 清除 URL 中的 hash
                             if (window.location.hash) {
                                 window.history.replaceState(null, '', window.location.pathname);
+                            }
+                            
+                            // 如果是 Magic Link 回调，标记为正在处理
+                            if (window.location.hash.includes('access_token')) {
+                                isProcessingMagicLink = true;
                             }
                             
                             // 顯示主應用并同步数据
@@ -2444,6 +2452,9 @@
                             renderAll();
                             updateAuthUI();
                             
+                            // 重置 Magic Link 处理标记
+                            isProcessingMagicLink = false;
+                            
                             console.log('✅ Login completed!');
                         } else if (event === 'SIGNED_OUT') {
                             currentUser = null;
@@ -2460,8 +2471,46 @@
                     
                     if (hasAuthToken) {
                         console.log('🔗 Detected Magic Link callback in URL');
-                        // Supabase SDK 会自动处理这个 hash，我们只需要等待
-                        // 不要立即检查 session，让 SDK 先完成处理
+                        // Supabase SDK 会自动处理这个 hash 并触发 onAuthStateChange
+                        // 等待 onAuthStateChange 处理完成（最多等待 3 秒）
+                        let waitCount = 0;
+                        while (waitCount < 30 && !state.isLoggedIn) {
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                            waitCount++;
+                        }
+                        
+                        // 如果等待后仍然没有登录，手动检查 session
+                        if (!state.isLoggedIn) {
+                            const { data: { session } } = await supabaseClient.auth.getSession();
+                            if (session) {
+                                currentUser = session.user;
+                                state.isLoggedIn = true;
+                                state.userId = currentUser.id;
+                                console.log('✅ Magic Link session found after wait:', currentUser.email);
+                                
+                                // 初始化同步管理器
+                                if (!syncManager) {
+                                    syncManager = new SyncManager(localDB, supabaseClient);
+                                }
+                                
+                                // 从云端拉取数据
+                                try {
+                                    await syncManager.syncFromCloud();
+                                    await loadDataFromLocal();
+                                } catch (error) {
+                                    console.warn('⚠️ Failed to pull data from cloud:', error);
+                                }
+                                
+                                showMainApp();
+                                renderAll();
+                                updateAuthUI();
+                            }
+                        }
+                        
+                        // 清除 URL hash
+                        if (window.location.hash) {
+                            window.history.replaceState(null, '', window.location.pathname);
+                        }
                     }
 
                     // 检查现有会话
