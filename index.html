@@ -2532,6 +2532,15 @@
                                         // 即使上传失败，也确保显示本地数据
                                         await loadDataFromLocal();
                                     }
+                                } else if (!hasCloudData && !hasLocalData) {
+                                    // 首次登录且本地和云端都为空：可能是新浏览器，提示用户
+                                    console.log('ℹ️ First-time login: Both cloud and local are empty');
+                                    await loadDataFromLocal();
+                                    renderAll();
+                                    // 显示提示信息
+                                    setTimeout(() => {
+                                        alert('💡 提示：\n\n这是首次登录，目前没有数据。\n\n如果您在其他浏览器（如 Safari）中有数据，请：\n1. 在那个浏览器中打开此应用\n2. 登录后点击「立即同步到云端」\n3. 然后再回到此浏览器，数据会自动同步');
+                                    }, 1000);
                                 } else {
                                     // 已有云端数据或本地为空：执行双向合并
                                     console.log('🔄 Pulling data from cloud and merging...');
@@ -2633,6 +2642,15 @@
                                             // 即使上传失败，也确保显示本地数据
                                             await loadDataFromLocal();
                                         }
+                                    } else if (!hasCloudData && !hasLocalData) {
+                                        // 首次登录且本地和云端都为空：可能是新浏览器，提示用户
+                                        console.log('ℹ️ First-time login: Both cloud and local are empty');
+                                        await loadDataFromLocal();
+                                        renderAll();
+                                        // 显示提示信息
+                                        setTimeout(() => {
+                                            alert('💡 提示：\n\n这是首次登录，目前没有数据。\n\n如果您在其他浏览器（如 Safari）中有数据，请：\n1. 在那个浏览器中打开此应用\n2. 登录后点击「立即同步到云端」\n3. 然后再回到此浏览器，数据会自动同步');
+                                        }, 1000);
                                     } else {
                                         // 已有云端数据或本地为空：执行双向合并
                                         console.log('🔄 Pulling data from cloud and merging...');
@@ -2641,11 +2659,12 @@
                                         await loadDataFromLocal();
                                     }
                                     
-                                    console.log('✅ Data synchronized. All devices will show the same data.');
+                                    console.log(`✅ Data synchronized. Showing ${state.transactions.length} transactions.`);
                                 } catch (error) {
                                     console.warn('⚠️ Failed to sync data:', error);
                                     // 即使同步失败，也确保加载本地数据
                                     await loadDataFromLocal();
+                                    console.log(`⚠️ After error, showing ${state.transactions.length} transactions.`);
                                 }
                                 
                                 showMainApp();
@@ -2723,6 +2742,15 @@
                                     await loadDataFromLocal();
                                     renderAll();
                                 }
+                            } else if (!hasCloudData && !hasLocalData) {
+                                // 首次登录且本地和云端都为空：可能是新浏览器，提示用户
+                                console.log('ℹ️ First-time login: Both cloud and local are empty');
+                                await loadDataFromLocal();
+                                renderAll();
+                                // 显示提示信息
+                                setTimeout(() => {
+                                    alert('💡 提示：\n\n这是首次登录，目前没有数据。\n\n如果您在其他浏览器（如 Safari）中有数据，请：\n1. 在那个浏览器中打开此应用\n2. 登录后点击「立即同步到云端」\n3. 然后再回到此浏览器，数据会自动同步');
+                                }, 1000);
                             } else {
                                 // 已有云端数据或本地为空：执行双向合并
                                 console.log('🔄 Pulling data from cloud and merging...');
@@ -2732,12 +2760,13 @@
                                 renderAll();
                             }
                             
-                            console.log('✅ Data synchronized. All devices will show the same data.');
+                            console.log(`✅ Data synchronized. Showing ${state.transactions.length} transactions.`);
                         } catch (error) {
                             console.warn('⚠️ Failed to sync data:', error);
                             // 即使同步失败，也确保加载本地数据并刷新UI
                             await loadDataFromLocal();
                             renderAll();
+                            console.log(`⚠️ After error, showing ${state.transactions.length} transactions.`);
                         }
                     }
                 } else {
@@ -2846,7 +2875,7 @@
 
             const btnText = document.getElementById('btnMagicLinkText');
             const originalText = btnText.innerText;
-            btnText.innerText = '🔄 發送中...';
+            btnText.innerText = '🔄 準備中...';
 
             try {
                 const { data, error } = await supabaseClient.auth.signInWithOtp({
