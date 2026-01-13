@@ -1921,9 +1921,14 @@
 
                 // 加载交易记录（过滤掉已删除的记录）
                 const allTransactions = await localDB.getAll('transactions');
+                console.log(`📊 Found ${allTransactions.length} total transactions in IndexedDB`);
+                
+                // 过滤掉已删除的记录（is_deleted 为 true 或 undefined 时，!tx.is_deleted 为 true，所以会保留）
                 state.transactions = allTransactions
                     .filter(tx => !tx.is_deleted)  // 过滤掉已删除的记录
                     .sort((a, b) => b.date.localeCompare(a.date));
+                
+                console.log(`📊 After filtering deleted: ${state.transactions.length} active transactions`);
 
                 // 加载分类
                 const categories = await localDB.getAll('categories');
@@ -2507,32 +2512,46 @@
                                 console.log(`📊 Cloud data: ${hasCloudData ? 'exists' : 'empty'}, Local data: ${hasLocalData ? 'exists' : 'empty'}`);
                                 
                                 if (!hasCloudData && hasLocalData) {
-                                    // 首次登录：云端为空，本地有数据，先上传本地数据
-                                    console.log('📤 First-time login: Uploading local data to cloud...');
+                                    // 首次登录：云端为空，本地有数据
+                                    // 先显示本地数据，然后再上传
+                                    console.log('📤 First-time login: Local data detected, will upload to cloud...');
+                                    
+                                    // 先确保本地数据已显示
+                                    await loadDataFromLocal();
+                                    renderAll();
+                                    
+                                    // 然后上传本地数据到云端
+                                    console.log('📤 Uploading local data to cloud...');
                                     const uploadResult = await syncManager.syncToCloud();
                                     if (uploadResult.success) {
                                         console.log('✅ Local data uploaded to cloud');
+                                        // 上传后重新加载（虽然数据应该一样，但确保一致性）
+                                        await loadDataFromLocal();
                                     } else {
                                         console.warn('⚠️ Failed to upload local data:', uploadResult.error);
+                                        // 即使上传失败，也确保显示本地数据
+                                        await loadDataFromLocal();
                                     }
                                 } else {
                                     // 已有云端数据或本地为空：执行双向合并
                                     console.log('🔄 Pulling data from cloud and merging...');
                                     await syncManager.syncFromCloud();
+                                    // 重新加载合并后的数据
+                                    await loadDataFromLocal();
                                 }
                                 
-                                // 重新加载合并后的数据
-                                await loadDataFromLocal();
-                                console.log('✅ Data synchronized. All devices will show the same data.');
+                                console.log(`✅ Data synchronized. Showing ${state.transactions.length} transactions.`);
                             } catch (error) {
                                 console.warn('⚠️ Failed to sync data:', error);
                                 // 即使同步失败，也确保加载本地数据
                                 await loadDataFromLocal();
+                                console.log(`⚠️ After error, showing ${state.transactions.length} transactions.`);
                             }
                             
-                            // 刷新UI
+                            // 刷新UI（确保数据已显示）
                             renderAll();
                             updateAuthUI();
+                            console.log('✅ UI refreshed after login');
                             
                             // 重置 Magic Link 处理标记
                             isProcessingMagicLink = false;
@@ -2594,22 +2613,34 @@
                                     console.log(`📊 Cloud data: ${hasCloudData ? 'exists' : 'empty'}, Local data: ${hasLocalData ? 'exists' : 'empty'}`);
                                     
                                     if (!hasCloudData && hasLocalData) {
-                                        // 首次登录：云端为空，本地有数据，先上传本地数据
-                                        console.log('📤 First-time login: Uploading local data to cloud...');
+                                        // 首次登录：云端为空，本地有数据
+                                        // 先显示本地数据，然后再上传
+                                        console.log('📤 First-time login: Local data detected, will upload to cloud...');
+                                        
+                                        // 先确保本地数据已显示
+                                        await loadDataFromLocal();
+                                        renderAll();
+                                        
+                                        // 然后上传本地数据到云端
+                                        console.log('📤 Uploading local data to cloud...');
                                         const uploadResult = await syncManager.syncToCloud();
                                         if (uploadResult.success) {
                                             console.log('✅ Local data uploaded to cloud');
+                                            // 上传后重新加载（虽然数据应该一样，但确保一致性）
+                                            await loadDataFromLocal();
                                         } else {
                                             console.warn('⚠️ Failed to upload local data:', uploadResult.error);
+                                            // 即使上传失败，也确保显示本地数据
+                                            await loadDataFromLocal();
                                         }
                                     } else {
                                         // 已有云端数据或本地为空：执行双向合并
                                         console.log('🔄 Pulling data from cloud and merging...');
                                         await syncManager.syncFromCloud();
+                                        // 重新加载合并后的数据
+                                        await loadDataFromLocal();
                                     }
                                     
-                                    // 重新加载合并后的数据
-                                    await loadDataFromLocal();
                                     console.log('✅ Data synchronized. All devices will show the same data.');
                                 } catch (error) {
                                     console.warn('⚠️ Failed to sync data:', error);
@@ -2670,23 +2701,37 @@
                             console.log(`📊 Cloud data: ${hasCloudData ? 'exists' : 'empty'}, Local data: ${hasLocalData ? 'exists' : 'empty'}`);
                             
                             if (!hasCloudData && hasLocalData) {
-                                // 首次登录：云端为空，本地有数据，先上传本地数据
-                                console.log('📤 First-time login: Uploading local data to cloud...');
+                                // 首次登录：云端为空，本地有数据
+                                // 先显示本地数据，然后再上传
+                                console.log('📤 First-time login: Local data detected, will upload to cloud...');
+                                
+                                // 先确保本地数据已显示
+                                await loadDataFromLocal();
+                                renderAll();
+                                
+                                // 然后上传本地数据到云端
+                                console.log('📤 Uploading local data to cloud...');
                                 const uploadResult = await syncManager.syncToCloud();
                                 if (uploadResult.success) {
                                     console.log('✅ Local data uploaded to cloud');
+                                    // 上传后重新加载（虽然数据应该一样，但确保一致性）
+                                    await loadDataFromLocal();
+                                    renderAll();
                                 } else {
                                     console.warn('⚠️ Failed to upload local data:', uploadResult.error);
+                                    // 即使上传失败，也确保显示本地数据
+                                    await loadDataFromLocal();
+                                    renderAll();
                                 }
                             } else {
                                 // 已有云端数据或本地为空：执行双向合并
                                 console.log('🔄 Pulling data from cloud and merging...');
                                 await syncManager.syncFromCloud();
+                                // 重新加载合并后的数据
+                                await loadDataFromLocal();
+                                renderAll();
                             }
                             
-                            // 重新加载合并后的数据
-                            await loadDataFromLocal();
-                            renderAll(); // 刷新UI
                             console.log('✅ Data synchronized. All devices will show the same data.');
                         } catch (error) {
                             console.warn('⚠️ Failed to sync data:', error);
