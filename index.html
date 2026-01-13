@@ -2,8 +2,16 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="description" content="個人財務記帳應用程式">
+    <meta name="theme-color" content="#0a0a0c">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Ledger">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Ledger - Personal Finance</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%23ffffff' d='M64 32C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V96c0-35.3-28.7-64-64-64H64zm80 256h64c44.2 0 80 35.8 80 80c0 8.8-7.2 16-16 16H80c-8.8 0-16-7.2-16-16c0-44.2 35.8-80 80-80zm-32-96a64 64 0 1 1 128 0 64 64 0 1 1 -128 0zm256-32H304c-8.8 0-16 7.2-16 16s7.2 16 16 16H368c8.8 0 16-7.2 16-16s-7.2-16-16-16zm0 64H304c-8.8 0-16 7.2-16 16s7.2 16 16 16H368c8.8 0 16-7.2 16-16s-7.2-16-16-16zm0 64H304c-8.8 0-16 7.2-16 16s7.2 16 16 16H368c8.8 0 16-7.2 16-16s-7.2-16-16-16z'/%3E%3C/svg%3E">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
@@ -27,9 +35,24 @@
             background-color: var(--bg-deep);
             color: #ffffff;
             height: 100vh;
+            height: 100dvh; /* 动态视口高度，支持移动设备 */
             margin: 0;
+            padding: 0;
             overflow: hidden;
             transition: background-color 0.5s ease;
+            -webkit-tap-highlight-color: transparent;
+            /* 支持全屏模式 */
+            position: fixed;
+            width: 100%;
+            top: 0;
+            left: 0;
+        }
+        
+        /* 支持 iOS Safari 全屏模式 */
+        @supports (-webkit-touch-callout: none) {
+            body {
+                height: -webkit-fill-available;
+            }
         }
 
         body::before {
@@ -2127,10 +2150,42 @@
         });
 
         // ============================================
+        // PWA 支持 - 全屏模式
+        // ============================================
+        // 防止 iOS Safari 的橡皮筋效果
+        document.addEventListener('touchmove', function(e) {
+            if (e.target.closest('.scrollable')) return;
+            e.preventDefault();
+        }, { passive: false });
+
+        // 隐藏地址栏（iOS Safari）
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                window.scrollTo(0, 1);
+            }, 0);
+        });
+
+        // 防止双击缩放
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(e) {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+
+        // ============================================
         // 应用初始化
         // ============================================
         window.onload = async () => {
             console.log('🚀 Initializing Ledger App...');
+            
+            // 检查是否在全屏模式（添加到主屏幕后）
+            if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
+                console.log('✅ Running in standalone mode (added to home screen)');
+                document.body.classList.add('standalone');
+            }
 
             try {
                 // 1. 初始化 IndexedDB
