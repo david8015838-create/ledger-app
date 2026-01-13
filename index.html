@@ -1457,6 +1457,8 @@
 
                     // 1. 同步交易记录
                     const transactions = await this.localDB.getAll('transactions');
+                    const localTxIds = new Set(transactions.map(tx => tx.id));
+                    
                     if (transactions.length > 0) {
                         const txData = transactions.map(tx => ({
                             id: tx.id,
@@ -1477,18 +1479,54 @@
                         if (txError) throw txError;
                         console.log(`✅ Synced ${transactions.length} transactions`);
                     }
+                    
+                    // 1.1 删除云端中本地不存在的交易（实现真正的删除同步）
+                    const { data: cloudTransactions, error: fetchError } = await this.supabaseClient
+                        .from('transactions')
+                        .select('id')
+                        .eq('user_id', currentUser.id);
+                    
+                    if (fetchError) {
+                        console.warn('⚠️ Failed to fetch cloud transactions for deletion check:', fetchError);
+                    } else if (cloudTransactions) {
+                        const cloudTxIds = new Set(cloudTransactions.map(tx => tx.id));
+                        const toDelete = Array.from(cloudTxIds).filter(id => !localTxIds.has(id));
+                        
+                        if (toDelete.length > 0) {
+                            console.log(`🗑️ Found ${toDelete.length} transactions to delete from cloud:`, toDelete);
+                            const { error: deleteError } = await this.supabaseClient
+                                .from('transactions')
+                                .delete()
+                                .in('id', toDelete);
+                            
+                            if (deleteError) {
+                                console.error('❌ Failed to delete transactions from cloud:', deleteError);
+                                throw new Error(`Failed to delete transactions: ${deleteError.message}`);
+                            } else {
+                                console.log(`✅ Successfully deleted ${toDelete.length} transactions from cloud`);
+                            }
+                        } else {
+                            console.log('✅ No transactions to delete (cloud and local are in sync)');
+                        }
+                    }
 
                     // 2. 同步分类
                     const categories = await this.localDB.getAll('categories');
+                    const localCatIds = new Set();
+                    
                     if (categories.length > 0) {
-                        const catData = categories.map(cat => ({
-                            id: cat.id || crypto.randomUUID(),
-                            user_id: currentUser.id,
-                            name: cat.name,
-                            icon: cat.icon,
-                            color: cat.color,
-                            updated_at: cat.updated_at || new Date().toISOString()
-                        }));
+                        const catData = categories.map(cat => {
+                            const catId = cat.id || crypto.randomUUID();
+                            localCatIds.add(catId);
+                            return {
+                                id: catId,
+                                user_id: currentUser.id,
+                                name: cat.name,
+                                icon: cat.icon,
+                                color: cat.color,
+                                updated_at: cat.updated_at || new Date().toISOString()
+                            };
+                        });
 
                         const { error: catError } = await this.supabaseClient
                             .from('categories')
@@ -1497,18 +1535,45 @@
                         if (catError) throw catError;
                         console.log(`✅ Synced ${categories.length} categories`);
                     }
+                    
+                    // 2.1 删除云端中本地不存在的分类（实现真正的删除同步）
+                    const { data: cloudCategories, error: fetchCatError } = await this.supabaseClient
+                        .from('categories')
+                        .select('id')
+                        .eq('user_id', currentUser.id);
+                    
+                    if (!fetchCatError && cloudCategories) {
+                        const cloudCatIds = new Set(cloudCategories.map(cat => cat.id));
+                        const toDelete = Array.from(cloudCatIds).filter(id => !localCatIds.has(id));
+                        
+                        if (toDelete.length > 0) {
+                            const { error: deleteError } = await this.supabaseClient
+                                .from('categories')
+                                .delete()
+                                .in('id', toDelete);
+                            
+                            if (deleteError) {
+                                console.warn('⚠️ Failed to delete categories from cloud:', deleteError);
+                            } else {
+                                console.log(`✅ Deleted ${toDelete.length} categories from cloud`);
+                            }
+                        }
+                    }
 
                     // 3. 同步使用者設定
                     const budgetSetting = await this.localDB.get('settings', 'budget');
                     const themeSetting = await this.localDB.get('settings', 'themeId');
                     const currencySetting = await this.localDB.get('settings', 'currency');
+                    const settingsUpdatedAt = await this.localDB.get('settings', 'settings_updated_at');
 
+                    const now = new Date().toISOString();
                     const settingsData = {
                         user_id: currentUser.id,
                         budget: budgetSetting ? budgetSetting.value : 30000,
                         theme_id: themeSetting ? themeSetting.value : 'minimal',
                         currency: currencySetting ? currencySetting.value : 'TWD',
-                        last_sync_at: new Date().toISOString()
+                        updated_at: settingsUpdatedAt ? settingsUpdatedAt.value : now,
+                        last_sync_at: now
                     };
 
                     const { error: settingsError } = await this.supabaseClient
@@ -1585,9 +1650,11 @@
 
                     // 4. 儲存到本地（不覆蓋本地更新的資料）
                     if (transactions && transactions.length > 0) {
+                        let updatedCount = 0;
+                        let skippedCount = 0;
                         for (const tx of transactions) {
                             const local = await this.localDB.get('transactions', tx.id);
-                            if (!local || new Date(tx.updated_at) > new Date(local.updated_at)) {
+                            if (!local || new Date(tx.updated_at) > new Date(local.updated_at || 0)) {
                                 await this.localDB.put('transactions', {
                                     id: tx.id,
                                     amount: parseFloat(tx.amount),
@@ -1598,9 +1665,14 @@
                                     currency: tx.currency,
                                     updated_at: tx.updated_at
                                 });
+                                updatedCount++;
+                            } else {
+                                skippedCount++;
                             }
                         }
-                        console.log(`✅ Pulled ${transactions.length} transactions from cloud`);
+                        console.log(`✅ Pulled ${transactions.length} transactions from cloud (${updatedCount} updated, ${skippedCount} skipped - local is newer)`);
+                    } else {
+                        console.log('✅ No transactions in cloud (or all deleted)');
                     }
 
                     if (categories && categories.length > 0) {
@@ -1617,10 +1689,27 @@
                     }
 
                     if (settings) {
-                        await this.localDB.put('settings', { key: 'budget', value: parseFloat(settings.budget) });
-                        await this.localDB.put('settings', { key: 'themeId', value: settings.theme_id });
-                        await this.localDB.put('settings', { key: 'currency', value: settings.currency });
-                        console.log('✅ Pulled user settings from cloud');
+                        // 检查本地设置的更新时间，只更新较新的版本
+                        const localSettingsUpdatedAt = await this.localDB.get('settings', 'settings_updated_at');
+                        const cloudUpdatedAt = settings.updated_at || settings.last_sync_at;
+                        
+                        // 如果云端数据更新，或者本地没有更新时间戳，则更新本地设置
+                        if (!localSettingsUpdatedAt || !cloudUpdatedAt || 
+                            new Date(cloudUpdatedAt) > new Date(localSettingsUpdatedAt.value)) {
+                            await this.localDB.put('settings', { key: 'budget', value: parseFloat(settings.budget) });
+                            await this.localDB.put('settings', { key: 'themeId', value: settings.theme_id });
+                            await this.localDB.put('settings', { key: 'currency', value: settings.currency });
+                            await this.localDB.put('settings', { key: 'settings_updated_at', value: cloudUpdatedAt });
+                            
+                            // 更新 state
+                            state.budget = parseFloat(settings.budget);
+                            state.themeId = settings.theme_id;
+                            state.currency = settings.currency;
+                            
+                            console.log('✅ Pulled user settings from cloud (updated)');
+                        } else {
+                            console.log('✅ Local settings are newer, keeping local version');
+                        }
                     }
 
                     return { success: true };
@@ -1814,22 +1903,46 @@
         // 保存数据到 IndexedDB（本地优先）
         async function save() {
             try {
+                const now = new Date().toISOString();
                 // 保存到 IndexedDB
                 await localDB.put('settings', { key: 'budget', value: state.budget });
                 await localDB.put('settings', { key: 'themeId', value: state.themeId });
                 await localDB.put('settings', { key: 'currency', value: state.currency });
+                // 保存设置更新时间戳
+                await localDB.put('settings', { key: 'settings_updated_at', value: now });
+                
+                // 保存分类到 IndexedDB
+                for (const cat of state.categories) {
+                    await localDB.put('categories', {
+                        id: cat.id || crypto.randomUUID(),
+                        name: cat.name,
+                        icon: cat.icon,
+                        color: cat.color,
+                        updated_at: cat.updated_at || now
+                    });
+                }
 
                 // 同时保存到 localStorage 作为备份
                 localStorage.setItem('ledger_budget_v13', state.budget);
                 localStorage.setItem('ledger_theme_id_v13', state.themeId);
                 localStorage.setItem('ledger_currency_v13', state.currency);
+                localStorage.setItem('ledger_cats_v13', JSON.stringify(state.categories));
+                localStorage.setItem('ledger_settings_updated_at_v13', now);
+                
+                // 如果有同步管理器且在线，触发后台同步
+                if (syncManager && state.isOnline && currentUser) {
+                    syncManager.syncToCloud().catch(err => console.warn('Background sync failed:', err));
+                }
 
             } catch (error) {
                 console.error('❌ Save failed:', error);
                 // 回退到 localStorage
+                const now = new Date().toISOString();
                 localStorage.setItem('ledger_budget_v13', state.budget);
                 localStorage.setItem('ledger_theme_id_v13', state.themeId);
                 localStorage.setItem('ledger_currency_v13', state.currency);
+                localStorage.setItem('ledger_cats_v13', JSON.stringify(state.categories));
+                localStorage.setItem('ledger_settings_updated_at_v13', now);
             }
         }
 
@@ -1957,16 +2070,43 @@
             if (!syncManager || syncManager.isSyncing) return;
 
             updateSyncUI();
-            const result = await syncManager.syncToCloud();
+            
+            try {
+                console.log('🔄 Starting manual sync...');
+                
+                // 先同步到云端（上传本地数据，包括删除操作）
+                const result = await syncManager.syncToCloud();
 
-            if (result.success) {
-                console.log('✅ Manual sync completed');
-                // 可选：显示成功提示
-            } else {
-                console.warn('⚠️ Manual sync failed:', result.error);
+                if (result.success) {
+                    console.log('✅ Manual sync to cloud completed');
+                    console.log('   - Uploaded local transactions');
+                    console.log('   - Deleted removed transactions from cloud');
+                    console.log('   - Synced categories and settings');
+                    
+                    // 然后从云端拉取最新数据（合并云端和本地）
+                    await syncManager.syncFromCloud();
+                    console.log('✅ Pulled latest data from cloud');
+                    
+                    // 重新加载合并后的数据
+                    await loadDataFromLocal();
+                    console.log('✅ Reloaded data from local storage');
+                    
+                    // 刷新UI
+                    renderAll();
+                    console.log('✅ UI refreshed');
+                    
+                    // 显示成功提示
+                    alert('✅ 同步完成！所有更改已保存到云端。');
+                } else {
+                    console.warn('⚠️ Manual sync failed:', result.error);
+                    alert('⚠️ 同步失败：' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('❌ Manual sync error:', error);
+                alert('❌ 同步出错：' + error.message);
+            } finally {
+                updateSyncUI();
             }
-
-            updateSyncUI();
         }
 
         // 检查网络状态
@@ -2124,24 +2264,18 @@
             }
         };
 
-        function applyTheme(themeId) {
+        async function applyTheme(themeId) {
             const scheme = THEME_SCHEMES.find(s => s.id === themeId) || THEME_SCHEMES[0];
             state.themeId = themeId;
             document.documentElement.style.setProperty('--accent', scheme.color);
             document.documentElement.style.setProperty('--accent-rgb', scheme.rgb);
             document.documentElement.style.setProperty('--bg-deep', scheme.bg);
             document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${scheme.opacity})`);
-            save();
+            await save();
             if (myChart) renderStats();
         }
 
-        function save() {
-            localStorage.setItem('ledger_tx_v13', JSON.stringify(state.transactions));
-            localStorage.setItem('ledger_budget_v13', state.budget);
-            localStorage.setItem('ledger_cats_v13', JSON.stringify(state.categories));
-            localStorage.setItem('ledger_theme_id_v13', state.themeId);
-            localStorage.setItem('ledger_currency_v13', state.currency);
-        }
+        // 旧的 save() 函数已移除，统一使用 async save() 函数
 
         function updateHUDDate() {
             const d = new Date();
@@ -2703,7 +2837,7 @@
                 localStorage.setItem('ledger_tx_v13', JSON.stringify(state.transactions));
             }
             
-            save();
+            await save();
             nav('home');
         }
 
@@ -2732,15 +2866,15 @@
                 localStorage.setItem('ledger_tx_v13', JSON.stringify(state.transactions));
             }
             
-            save();
+            await save();
             nav('home');
         }
 
         function renderSettings() {
             document.getElementById('budgetInput').value = state.budget;
-            document.getElementById('themePicker').innerHTML = THEME_SCHEMES.map(s => `<div onclick="applyTheme('${s.id}'); renderSettings()" class="theme-dot ${state.themeId === s.id ? 'active' : ''}" style="background-color: ${s.color}; color: ${s.color}"></div>`).join('');
+            document.getElementById('themePicker').innerHTML = THEME_SCHEMES.map(s => `<div onclick="applyTheme('${s.id}').then(() => renderSettings())" class="theme-dot ${state.themeId === s.id ? 'active' : ''}" style="background-color: ${s.color}; color: ${s.color}"></div>`).join('');
             document.getElementById('currencyPicker').innerHTML = CURRENCY_OPTIONS.map(c => `
-                <button onclick="changeCurrency('${c.id}')" class="flex flex-col items-center p-4 rounded-2xl transition-all ${state.currency === c.id ? 'dynamic-accent-bg text-black' : 'bg-white/5 text-white/50 hover:bg-white/10'}">
+                <button onclick="changeCurrency('${c.id}')" class="flex flex-col items-center p-4 rounded-2xl transition-all ${state.currency === c.id ? 'dynamic-accent-bg text-black' : 'bg-white/5 text-white/50 hover:bg-white/10'}" type="button">
                     <span class="text-2xl mb-1">${c.flag}</span>
                     <span class="text-[9px] font-black">${c.id}</span>
                 </button>
@@ -2789,9 +2923,9 @@
             }
         }
 
-        function changeCurrency(currencyId) {
+        async function changeCurrency(currencyId) {
             state.currency = currencyId;
-            save();
+            await save();
             updateCurrencySymbols();
             renderSettings();
             renderHome();
@@ -3027,15 +3161,37 @@
             }
         }
         
-        function confirmAddCategory() { 
+        async function confirmAddCategory() { 
             const name = document.getElementById('newCatName').value.trim(); 
             if(!name || !state.tempEmoji) return; 
             state.categories.push({ name, icon: state.tempEmoji, color: '#'+Math.floor(Math.random()*16777215).toString(16) }); 
-            save(); renderSettings(); closeCatModal(); 
+            await save(); 
+            renderSettings(); 
+            closeCatModal(); 
             document.getElementById('newCatName').value = "";
         }
 
-        function deleteCat(name) { if(state.categories.length > 1) { state.categories = state.categories.filter(c => c.name !== name); save(); renderSettings(); } }
+        async function deleteCat(name) { 
+            if(state.categories.length > 1) { 
+                // 先找到要删除的分类（在过滤之前）
+                const catToDelete = state.categories.find(c => c.name === name);
+                
+                // 从 state 中删除分类
+                state.categories = state.categories.filter(c => c.name !== name); 
+                
+                // 从 IndexedDB 删除分类
+                if (catToDelete && catToDelete.id) {
+                    try {
+                        await localDB.delete('categories', catToDelete.id);
+                    } catch (error) {
+                        console.warn('Failed to delete category from IndexedDB:', error);
+                    }
+                }
+                
+                await save(); 
+                renderSettings(); 
+            } 
+        }
         function clearAllData() { if(confirm("確定重置所有數據？此操作無法還原。")) { localStorage.clear(); location.reload(); } }
     </script>
 </body>
