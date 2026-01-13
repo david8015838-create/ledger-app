@@ -1478,14 +1478,48 @@
                 updateSyncUI();
 
                 try {
-                    console.log('🔄 Starting sync to cloud...');
+                    console.log('🔄 Starting bidirectional merge sync...');
 
-                    // 1. 同步交易记录
-                    const transactions = await this.localDB.getAll('transactions');
-                    const localTxIds = new Set(transactions.map(tx => tx.id));
+                    // 步骤 A：获取云端和本地数据
+                    console.log('📥 Step A: Fetching cloud and local data...');
                     
-                    if (transactions.length > 0) {
-                        const txData = transactions.map(tx => ({
+                    // 获取云端数据（包括已删除的）
+                    const { data: cloudTransactions, error: fetchCloudError } = await this.supabaseClient
+                        .from('transactions')
+                        .select('*')
+                        .eq('user_id', currentUser.id)
+                        .gte('date', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+                    
+                    if (fetchCloudError) throw fetchCloudError;
+                    
+                    // 获取本地数据（包括已删除的）
+                    const localTransactions = await this.localDB.getAll('transactions');
+                    
+                    // 步骤 B：执行双向合并
+                    console.log('🔄 Step B: Executing bidirectional merge...');
+                    
+                    // 标准化数据，确保所有字段存在
+                    const normalizedCloud = (cloudTransactions || []).map(tx => ({
+                        ...tx,
+                        is_deleted: tx.is_deleted || false,
+                        updated_at: tx.updated_at || new Date().toISOString()
+                    }));
+                    
+                    const normalizedLocal = localTransactions.map(tx => ({
+                        ...tx,
+                        is_deleted: tx.is_deleted || false,
+                        updated_at: tx.updated_at || new Date().toISOString()
+                    }));
+                    
+                    // 执行双向合并
+                    const mergedTransactions = this.mergeTransactions(normalizedCloud, normalizedLocal);
+                    
+                    // 步骤 C：更新云端和本地
+                    console.log('💾 Step C: Writing merged data...');
+                    
+                    // 更新云端：上传完整的合并数据（包括已删除的）
+                    if (mergedTransactions.length > 0) {
+                        const txData = mergedTransactions.map(tx => ({
                             id: tx.id,
                             user_id: currentUser.id,
                             amount: tx.amount,
@@ -1494,7 +1528,8 @@
                             category: tx.category,
                             icon: tx.icon,
                             currency: tx.currency || 'TWD',
-                            updated_at: tx.updated_at || new Date().toISOString()
+                            updated_at: tx.updated_at,
+                            is_deleted: tx.is_deleted || false
                         }));
 
                         const { error: txError } = await this.supabaseClient
@@ -1502,38 +1537,24 @@
                             .upsert(txData, { onConflict: 'id' });
 
                         if (txError) throw txError;
-                        console.log(`✅ Synced ${transactions.length} transactions`);
+                        console.log(`✅ Uploaded ${mergedTransactions.length} merged transactions to cloud`);
                     }
                     
-                    // 1.1 删除云端中本地不存在的交易（实现真正的删除同步）
-                    const { data: cloudTransactions, error: fetchError } = await this.supabaseClient
-                        .from('transactions')
-                        .select('id')
-                        .eq('user_id', currentUser.id);
-                    
-                    if (fetchError) {
-                        console.warn('⚠️ Failed to fetch cloud transactions for deletion check:', fetchError);
-                    } else if (cloudTransactions) {
-                        const cloudTxIds = new Set(cloudTransactions.map(tx => tx.id));
-                        const toDelete = Array.from(cloudTxIds).filter(id => !localTxIds.has(id));
-                        
-                        if (toDelete.length > 0) {
-                            console.log(`🗑️ Found ${toDelete.length} transactions to delete from cloud:`, toDelete);
-                            const { error: deleteError } = await this.supabaseClient
-                                .from('transactions')
-                                .delete()
-                                .in('id', toDelete);
-                            
-                            if (deleteError) {
-                                console.error('❌ Failed to delete transactions from cloud:', deleteError);
-                                throw new Error(`Failed to delete transactions: ${deleteError.message}`);
-                            } else {
-                                console.log(`✅ Successfully deleted ${toDelete.length} transactions from cloud`);
-                            }
-                        } else {
-                            console.log('✅ No transactions to delete (cloud and local are in sync)');
-                        }
+                    // 更新本地：保存完整的合并数据（包括已删除的，用于同步）
+                    for (const tx of mergedTransactions) {
+                        await this.localDB.put('transactions', {
+                            id: tx.id,
+                            amount: parseFloat(tx.amount),
+                            date: tx.date,
+                            note: tx.note || '',
+                            category: tx.category,
+                            icon: tx.icon,
+                            currency: tx.currency || 'TWD',
+                            updated_at: tx.updated_at,
+                            is_deleted: tx.is_deleted || false
+                        });
                     }
+                    console.log(`✅ Saved ${mergedTransactions.length} merged transactions to local`);
 
                     // 2. 同步分类
                     const categories = await this.localDB.getAll('categories');
@@ -1639,6 +1660,49 @@
                 }
             }
 
+            // 双向合并算法：合并云端和本地数据
+            mergeTransactions(cloudData, localData) {
+                const mergedMap = new Map();
+                
+                // 1. 先添加所有本地数据
+                localData.forEach(tx => {
+                    mergedMap.set(tx.id, { ...tx });
+                });
+                
+                // 2. 处理云端数据
+                cloudData.forEach(cloudTx => {
+                    const localTx = mergedMap.get(cloudTx.id);
+                    
+                    if (!localTx) {
+                        // ID 只存在于云端，直接添加
+                        mergedMap.set(cloudTx.id, {
+                            ...cloudTx,
+                            is_deleted: cloudTx.is_deleted || false
+                        });
+                    } else {
+                        // ID 同时存在于双方，比较 updated_at
+                        const cloudUpdatedAt = new Date(cloudTx.updated_at || 0).getTime();
+                        const localUpdatedAt = new Date(localTx.updated_at || 0).getTime();
+                        
+                        if (cloudUpdatedAt > localUpdatedAt) {
+                            // 云端数据更新，使用云端数据
+                            mergedMap.set(cloudTx.id, {
+                                ...cloudTx,
+                                is_deleted: cloudTx.is_deleted || false
+                            });
+                        } else {
+                            // 本地数据更新，保留本地数据（但确保 is_deleted 字段存在）
+                            mergedMap.set(cloudTx.id, {
+                                ...localTx,
+                                is_deleted: localTx.is_deleted || false
+                            });
+                        }
+                    }
+                });
+                
+                return Array.from(mergedMap.values());
+            }
+
             async syncFromCloud() {
                 if (!this.supabaseClient || !currentUser) {
                     return { success: false, error: 'offline' };
@@ -1647,8 +1711,8 @@
                 try {
                     console.log('🔄 Pulling data from cloud...');
 
-                    // 1. 拉取交易记录（仅最近 365 天）
-                    const { data: transactions, error: txError } = await this.supabaseClient
+                    // 1. 拉取交易记录（仅最近 365 天，包括已删除的）
+                    const { data: cloudTransactions, error: txError } = await this.supabaseClient
                         .from('transactions')
                         .select('*')
                         .eq('user_id', currentUser.id)
@@ -1674,32 +1738,43 @@
 
                     if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
 
-                    // 4. 儲存到本地（不覆蓋本地更新的資料）
-                    if (transactions && transactions.length > 0) {
-                        let updatedCount = 0;
-                        let skippedCount = 0;
-                        for (const tx of transactions) {
-                            const local = await this.localDB.get('transactions', tx.id);
-                            if (!local || new Date(tx.updated_at) > new Date(local.updated_at || 0)) {
-                                await this.localDB.put('transactions', {
-                                    id: tx.id,
-                                    amount: parseFloat(tx.amount),
-                                    date: tx.date,
-                                    note: tx.note,
-                                    category: tx.category,
-                                    icon: tx.icon,
-                                    currency: tx.currency,
-                                    updated_at: tx.updated_at
-                                });
-                                updatedCount++;
-                            } else {
-                                skippedCount++;
-                            }
-                        }
-                        console.log(`✅ Pulled ${transactions.length} transactions from cloud (${updatedCount} updated, ${skippedCount} skipped - local is newer)`);
-                    } else {
-                        console.log('✅ No transactions in cloud (or all deleted)');
+                    // 4. 执行双向合并：获取本地数据并合并
+                    const localTransactions = await this.localDB.getAll('transactions');
+                    
+                    // 确保所有记录都有 is_deleted 字段
+                    const normalizedCloud = (cloudTransactions || []).map(tx => ({
+                        ...tx,
+                        is_deleted: tx.is_deleted || false,
+                        updated_at: tx.updated_at || new Date().toISOString()
+                    }));
+                    
+                    const normalizedLocal = localTransactions.map(tx => ({
+                        ...tx,
+                        is_deleted: tx.is_deleted || false,
+                        updated_at: tx.updated_at || new Date().toISOString()
+                    }));
+                    
+                    // 执行双向合并
+                    const mergedTransactions = this.mergeTransactions(normalizedCloud, normalizedLocal);
+                    
+                    // 保存合并后的数据到本地（包括已删除的记录，用于同步）
+                    let savedCount = 0;
+                    for (const tx of mergedTransactions) {
+                        await this.localDB.put('transactions', {
+                            id: tx.id,
+                            amount: parseFloat(tx.amount),
+                            date: tx.date,
+                            note: tx.note || '',
+                            category: tx.category,
+                            icon: tx.icon,
+                            currency: tx.currency || 'TWD',
+                            updated_at: tx.updated_at,
+                            is_deleted: tx.is_deleted || false
+                        });
+                        savedCount++;
                     }
+                    
+                    console.log(`✅ Merged ${mergedTransactions.length} transactions (${savedCount} saved to local)`);
 
                     if (categories && categories.length > 0) {
                         for (const cat of categories) {
@@ -1816,9 +1891,11 @@
             try {
                 console.log('📂 Loading data from IndexedDB...');
 
-                // 加载交易记录
-                const transactions = await localDB.getAll('transactions');
-                state.transactions = transactions.sort((a, b) => b.date.localeCompare(a.date));
+                // 加载交易记录（过滤掉已删除的记录）
+                const allTransactions = await localDB.getAll('transactions');
+                state.transactions = allTransactions
+                    .filter(tx => !tx.is_deleted)  // 过滤掉已删除的记录
+                    .sort((a, b) => b.date.localeCompare(a.date));
 
                 // 加载分类
                 const categories = await localDB.getAll('categories');
@@ -2074,6 +2151,10 @@
                     syncBtnText.innerText = '🔄 同步中...';
                     manualSyncBtn.disabled = true;
                     manualSyncBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    // 显示同步进度提示
+                    if (lastSyncDisplay) {
+                        lastSyncDisplay.innerText = '同步中，请勿关闭...';
+                    }
                 } else if (!supabaseClient) {
                     syncBtnText.innerText = '☁️ 未配置雲端';
                     manualSyncBtn.disabled = true;
@@ -2090,45 +2171,125 @@
             }
         }
 
-        // 手动同步按钮
+        // 手动同步按钮（双向增量合并）
         async function manualSync() {
             if (!syncManager || syncManager.isSyncing) return;
+
+            // 保存本地数据快照，用于失败时撤销
+            let localSnapshot = null;
+            try {
+                localSnapshot = await localDB.getAll('transactions');
+            } catch (e) {
+                console.warn('⚠️ Failed to create snapshot:', e);
+            }
 
             updateSyncUI();
             
             try {
-                console.log('🔄 Starting manual sync...');
+                console.log('🔄 Starting bidirectional merge sync...');
                 
-                // 先同步到云端（上传本地数据，包括删除操作）
+                // 步骤 A：获取云端和本地数据
+                // 步骤 B：执行双向合并
+                // 步骤 C：更新云端和本地
+                // 这些步骤都在 syncToCloud() 中完成
                 const result = await syncManager.syncToCloud();
 
                 if (result.success) {
-                    console.log('✅ Manual sync to cloud completed');
-                    console.log('   - Uploaded local transactions');
-                    console.log('   - Deleted removed transactions from cloud');
-                    console.log('   - Synced categories and settings');
+                    console.log('✅ Bidirectional merge sync completed');
                     
-                    // 然后从云端拉取最新数据（合并云端和本地）
-                    await syncManager.syncFromCloud();
-                    console.log('✅ Pulled latest data from cloud');
+                    // 同步分类和设置
+                    const categories = await localDB.getAll('categories');
+                    if (categories.length > 0) {
+                        const catData = categories.map(cat => ({
+                            id: cat.id || crypto.randomUUID(),
+                            user_id: currentUser.id,
+                            name: cat.name,
+                            icon: cat.icon,
+                            color: cat.color,
+                            updated_at: cat.updated_at || new Date().toISOString()
+                        }));
+
+                        const { error: catError } = await syncManager.supabaseClient
+                            .from('categories')
+                            .upsert(catData, { onConflict: 'id' });
+
+                        if (catError) throw catError;
+                        console.log('✅ Synced categories');
+                    }
                     
-                    // 重新加载合并后的数据
+                    // 同步设置
+                    const budgetSetting = await localDB.get('settings', 'budget');
+                    const themeSetting = await localDB.get('settings', 'themeId');
+                    const currencySetting = await localDB.get('settings', 'currency');
+                    const settingsUpdatedAt = await localDB.get('settings', 'settings_updated_at');
+
+                    const now = new Date().toISOString();
+                    const settingsData = {
+                        user_id: currentUser.id,
+                        budget: budgetSetting ? budgetSetting.value : 30000,
+                        theme_id: themeSetting ? themeSetting.value : 'minimal',
+                        currency: currencySetting ? currencySetting.value : 'TWD',
+                        updated_at: settingsUpdatedAt ? settingsUpdatedAt.value : now,
+                        last_sync_at: now
+                    };
+
+                    const { error: settingsError } = await syncManager.supabaseClient
+                        .from('user_settings')
+                        .upsert(settingsData, { onConflict: 'user_id' });
+
+                    if (settingsError) throw settingsError;
+                    console.log('✅ Synced user settings');
+                    
+                    // 记录最后同步时间
+                    await syncManager.setLastSyncTime(new Date());
+                    
+                    // 重新加载合并后的数据（过滤掉已删除的）
                     await loadDataFromLocal();
-                    console.log('✅ Reloaded data from local storage');
+                    console.log('✅ Reloaded merged data from local storage');
                     
                     // 刷新UI
                     renderAll();
                     console.log('✅ UI refreshed');
                     
                     // 显示成功提示
-                    alert('✅ 同步完成！所有更改已保存到云端。');
+                    alert('✅ 同步完成！所有更改已通过双向合并保存到云端。');
                 } else {
                     console.warn('⚠️ Manual sync failed:', result.error);
-                    alert('⚠️ 同步失败：' + (result.error || '未知错误'));
+                    
+                    // 撤销：恢复快照
+                    if (localSnapshot) {
+                        try {
+                            for (const tx of localSnapshot) {
+                                await localDB.put('transactions', tx);
+                            }
+                            await loadDataFromLocal();
+                            renderAll();
+                            console.log('✅ Local changes reverted');
+                        } catch (revertError) {
+                            console.error('❌ Failed to revert changes:', revertError);
+                        }
+                    }
+                    
+                    alert('⚠️ 同步失败：' + (result.error || '未知错误') + '\n\n本地更改已撤销。');
                 }
             } catch (error) {
                 console.error('❌ Manual sync error:', error);
-                alert('❌ 同步出错：' + error.message);
+                
+                // 撤销：恢复快照
+                if (localSnapshot) {
+                    try {
+                        for (const tx of localSnapshot) {
+                            await localDB.put('transactions', tx);
+                        }
+                        await loadDataFromLocal();
+                        renderAll();
+                        console.log('✅ Local changes reverted after error');
+                    } catch (revertError) {
+                        console.error('❌ Failed to revert changes:', revertError);
+                    }
+                }
+                
+                alert('❌ 同步出错：' + error.message + '\n\n本地更改已撤销。');
             } finally {
                 updateSyncUI();
             }
@@ -2914,7 +3075,8 @@
                 note: document.getElementById('formNote').value, 
                 category: state.tempCat, 
                 icon: catObj.icon,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
+                is_deleted: false  // 确保新记录标记为未删除
             };
             
             // 保存到本地 IndexedDB
@@ -2956,14 +3118,23 @@
             if (!state.editingId) return;
             
             try {
-                // 从 IndexedDB 删除
-                await localDB.delete('transactions', state.editingId);
-                
-                // 更新 state
-                state.transactions = state.transactions.filter(t => t.id !== state.editingId);
-                
-                // 备份到 localStorage
-                localStorage.setItem('ledger_tx_v13', JSON.stringify(state.transactions));
+                // 软删除：标记为已删除，而不是真正删除
+                const tx = await localDB.get('transactions', state.editingId);
+                if (tx) {
+                    tx.is_deleted = true;
+                    tx.updated_at = new Date().toISOString();
+                    await localDB.put('transactions', tx);
+                    
+                    // 更新 state（从显示中移除，但保留在数据库中）
+                    state.transactions = state.transactions.filter(t => t.id !== state.editingId);
+                    
+                    // 备份到 localStorage（过滤掉已删除的）
+                    localStorage.setItem('ledger_tx_v13', JSON.stringify(state.transactions));
+                } else {
+                    // 如果本地没有，直接从 state 中移除
+                    state.transactions = state.transactions.filter(t => t.id !== state.editingId);
+                    localStorage.setItem('ledger_tx_v13', JSON.stringify(state.transactions));
+                }
                 
                 // 不再自动同步，需要用户手动点击同步按钮
                 
@@ -3275,7 +3446,28 @@
         async function confirmAddCategory() { 
             const name = document.getElementById('newCatName').value.trim(); 
             if(!name || !state.tempEmoji) return; 
-            state.categories.push({ name, icon: state.tempEmoji, color: '#'+Math.floor(Math.random()*16777215).toString(16) }); 
+            const newCategory = { 
+                name, 
+                icon: state.tempEmoji, 
+                color: '#'+Math.floor(Math.random()*16777215).toString(16),
+                updated_at: new Date().toISOString()
+            };
+            state.categories.push(newCategory);
+            
+            // 保存到 IndexedDB
+            try {
+                const catId = crypto.randomUUID();
+                await localDB.put('categories', {
+                    id: catId,
+                    name: newCategory.name,
+                    icon: newCategory.icon,
+                    color: newCategory.color,
+                    updated_at: newCategory.updated_at
+                });
+            } catch (error) {
+                console.error('Failed to save category:', error);
+            }
+            
             await save(); 
             renderSettings(); 
             closeCatModal(); 
