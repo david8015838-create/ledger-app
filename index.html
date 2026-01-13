@@ -1953,10 +1953,7 @@
                 localStorage.setItem('ledger_cats_v13', JSON.stringify(state.categories));
                 localStorage.setItem('ledger_settings_updated_at_v13', now);
                 
-                // 如果有同步管理器且在线，触发后台同步
-                if (syncManager && state.isOnline && currentUser) {
-                    syncManager.syncToCloud().catch(err => console.warn('Background sync failed:', err));
-                }
+                // 不再自动同步，需要用户手动点击同步按钮
 
             } catch (error) {
                 console.error('❌ Save failed:', error);
@@ -2138,10 +2135,7 @@
             console.log('🌐 Network online');
             state.isOnline = true;
             updateSyncUI();
-            // 自動同步
-            if (syncManager) {
-                syncManager.syncToCloud().catch(err => console.warn('Auto sync failed:', err));
-            }
+            // 不再自动同步，需要用户手动点击同步按钮
         });
 
         window.addEventListener('offline', () => {
@@ -2271,17 +2265,14 @@
                                 syncManager = new SyncManager(localDB, supabaseClient);
                             }
                             
-                            // 自動同步
-                            console.log('🔄 Starting initial sync...');
-                            await syncManager.syncFromCloud();
-                            await loadDataFromLocal(); // 重新加载合并后的数据
-                            await syncManager.syncToCloud();
+                            // 不再自动同步，需要用户手动点击同步按钮
+                            console.log('✅ User signed in. Use manual sync button to sync data.');
                             
                             // 刷新UI
                             renderAll();
                             updateAuthUI();
                             
-                            console.log('✅ Login and sync completed!');
+                            console.log('✅ Login completed!');
                         } else if (event === 'SIGNED_OUT') {
                             currentUser = null;
                             state.isLoggedIn = false;
@@ -2320,12 +2311,9 @@
                     // 获取最后同步时间
                     syncManager.lastSyncTime = await syncManager.getLastSyncTime();
 
-                    // 自動同步（如果已登入）
+                    // 不再自动同步，需要用户手动点击同步按钮
                     if (state.isLoggedIn && currentUser) {
-                        console.log('🔄 Auto-syncing...');
-                        await syncManager.syncFromCloud();
-                        await loadDataFromLocal(); // 重新加载合并后的数据
-                        await syncManager.syncToCloud(); // 同步本地新数据到云端
+                        console.log('✅ App initialized. Use manual sync button to sync data.');
                     }
                 } else {
                     console.log('ℹ️ Running in local-only mode (Supabase not configured)');
@@ -2926,10 +2914,7 @@
                 // 备份到 localStorage
                 localStorage.setItem('ledger_tx_v13', JSON.stringify(state.transactions));
                 
-                // 背景同步到雲端（不等待结果）
-                if (syncManager && state.isOnline) {
-                    syncManager.syncToCloud().catch(err => console.warn('Background sync failed:', err));
-                }
+                // 不再自动同步，需要用户手动点击同步按钮
                 
             } catch (error) {
                 console.error('❌ Failed to save transaction:', error);
@@ -2961,10 +2946,7 @@
                 // 备份到 localStorage
                 localStorage.setItem('ledger_tx_v13', JSON.stringify(state.transactions));
                 
-                // 背景同步到雲端（軟刪除）
-                if (syncManager && state.isOnline) {
-                    syncManager.syncToCloud().catch(err => console.warn('Background sync failed:', err));
-                }
+                // 不再自动同步，需要用户手动点击同步按钮
                 
             } catch (error) {
                 console.error('❌ Failed to delete transaction:', error);
@@ -3042,10 +3024,7 @@
             state.budget = parseFloat(document.getElementById('budgetInput').value) || state.budget;
             await save();
             
-            // 背景同步到雲端
-            if (syncManager && state.isOnline) {
-                syncManager.syncToCloud().catch(err => console.warn('Background sync failed:', err));
-            }
+            // 不再自动同步，需要用户手动点击同步按钮
             
             nav('home');
         }
@@ -3242,17 +3221,15 @@
                     <div class="text-left bg-green-500/10 border border-green-500/30 rounded-xl p-4 mt-3">
                         <p class="text-[10px] font-black text-green-400 uppercase mb-2">🎉 歡迎回來</p>
                         <p class="text-[11px] text-white mb-2">Email: ${codeData.email}</p>
-                        <p class="text-[10px] text-white/60">正在同步您的資料...</p>
                     </div>`, 'success');
                 
                 // 清空輸入
                 document.getElementById('loginCode').value = '';
                 
-                // 同步資料並跳轉到主頁面
+                // 跳轉到主頁面（不再自动同步）
                 setTimeout(async () => {
+                    // 不再自动同步，需要用户手动点击同步按钮
                     if (syncManager) {
-                        await syncManager.syncFromCloud();
-                        await syncManager.syncToCloud();
                         await loadDataFromLocal();
                     }
                     showMainApp();
