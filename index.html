@@ -1446,6 +1446,7 @@
                 this.isSyncing = false;
                 this.lastSyncTime = null;
                 this.syncError = null;
+                this.hasSyncedThisSession = false; // 标记本会话是否已同步
             }
 
             async getLastSyncTime() {
@@ -1619,6 +1620,7 @@
 
                     // 5. 更新最後同步時間
                     this.lastSyncTime = new Date();
+                    this.hasSyncedThisSession = true; // 标记本会话已同步
                     await this.setLastSyncTime(this.lastSyncTime);
 
                     this.isSyncing = false;
@@ -2013,9 +2015,11 @@
                     statusBadge.innerHTML = '<span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full">同步中...</span>';
                 } else if (syncManager.syncError) {
                     statusBadge.innerHTML = '<span class="bg-red-500/20 text-red-400 px-2 py-1 rounded-full">同步失败</span>';
-                } else if (syncManager.lastSyncTime) {
+                } else if (syncManager.lastSyncTime && syncManager.hasSyncedThisSession) {
+                    // 只有在本会话中成功同步过才显示"已同步"
                     statusBadge.innerHTML = '<span class="bg-green-500/20 text-green-400 px-2 py-1 rounded-full">已同步</span>';
                 } else {
+                    // 应用启动时或从未同步过，显示"未同步"
                     statusBadge.innerHTML = '<span class="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">未同步</span>';
                 }
             }
