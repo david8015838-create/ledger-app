@@ -2486,14 +2486,38 @@
                                 syncManager = new SyncManager(localDB, supabaseClient);
                             }
                             
-                            // 登录后从云端拉取数据（确保所有设备数据一致，但不自动上传）
-                            console.log('🔄 Pulling data from cloud after login to ensure consistency...');
+                            // 登录后执行首次同步：如果云端为空，先上传本地数据；否则执行双向合并
+                            console.log('🔄 Checking cloud data after login...');
                             try {
-                                await syncManager.syncFromCloud();
+                                // 先检查云端是否有数据
+                                const { data: cloudCheck, error: checkError } = await supabaseClient
+                                    .from('transactions')
+                                    .select('id')
+                                    .eq('user_id', currentUser.id)
+                                    .limit(1);
+                                
+                                const hasCloudData = !checkError && cloudCheck && cloudCheck.length > 0;
+                                const hasLocalData = state.transactions && state.transactions.length > 0;
+                                
+                                if (!hasCloudData && hasLocalData) {
+                                    // 首次登录：云端为空，本地有数据，先上传本地数据
+                                    console.log('📤 First-time login: Uploading local data to cloud...');
+                                    const uploadResult = await syncManager.syncToCloud();
+                                    if (uploadResult.success) {
+                                        console.log('✅ Local data uploaded to cloud');
+                                    } else {
+                                        console.warn('⚠️ Failed to upload local data:', uploadResult.error);
+                                    }
+                                } else {
+                                    // 已有云端数据或本地为空：执行双向合并
+                                    console.log('🔄 Pulling data from cloud and merging...');
+                                    await syncManager.syncFromCloud();
+                                }
+                                
                                 await loadDataFromLocal(); // 重新加载合并后的数据
-                                console.log('✅ Data pulled from cloud. All devices will show the same data.');
+                                console.log('✅ Data synchronized. All devices will show the same data.');
                             } catch (error) {
-                                console.warn('⚠️ Failed to pull data from cloud:', error);
+                                console.warn('⚠️ Failed to sync data:', error);
                             }
                             
                             // 刷新UI
@@ -2541,12 +2565,37 @@
                                     syncManager = new SyncManager(localDB, supabaseClient);
                                 }
                                 
-                                // 从云端拉取数据
+                                // 检查并同步数据（首次登录时上传本地数据）
                                 try {
-                                    await syncManager.syncFromCloud();
+                                    // 先检查云端是否有数据
+                                    const { data: cloudCheck, error: checkError } = await supabaseClient
+                                        .from('transactions')
+                                        .select('id')
+                                        .eq('user_id', currentUser.id)
+                                        .limit(1);
+                                    
+                                    const hasCloudData = !checkError && cloudCheck && cloudCheck.length > 0;
+                                    const localData = await localDB.getAll('transactions');
+                                    const hasLocalData = localData && localData.length > 0;
+                                    
+                                    if (!hasCloudData && hasLocalData) {
+                                        // 首次登录：云端为空，本地有数据，先上传本地数据
+                                        console.log('📤 First-time login: Uploading local data to cloud...');
+                                        const uploadResult = await syncManager.syncToCloud();
+                                        if (uploadResult.success) {
+                                            console.log('✅ Local data uploaded to cloud');
+                                        } else {
+                                            console.warn('⚠️ Failed to upload local data:', uploadResult.error);
+                                        }
+                                    } else {
+                                        // 已有云端数据或本地为空：执行双向合并
+                                        console.log('🔄 Pulling data from cloud and merging...');
+                                        await syncManager.syncFromCloud();
+                                    }
+                                    
                                     await loadDataFromLocal();
                                 } catch (error) {
-                                    console.warn('⚠️ Failed to pull data from cloud:', error);
+                                    console.warn('⚠️ Failed to sync data:', error);
                                 }
                                 
                                 showMainApp();
@@ -2580,16 +2629,40 @@
                     // 获取最后同步时间
                     syncManager.lastSyncTime = await syncManager.getLastSyncTime();
 
-                    // 如果已登录，从云端拉取数据（确保所有设备数据一致，但不自动上传）
+                    // 如果已登录，检查并同步数据（首次登录时上传本地数据）
                     if (state.isLoggedIn && currentUser) {
-                        console.log('🔄 Pulling data from cloud on startup to ensure consistency...');
+                        console.log('🔄 Checking cloud data on startup...');
                         try {
-                            await syncManager.syncFromCloud();
+                            // 先检查云端是否有数据
+                            const { data: cloudCheck, error: checkError } = await supabaseClient
+                                .from('transactions')
+                                .select('id')
+                                .eq('user_id', currentUser.id)
+                                .limit(1);
+                            
+                            const hasCloudData = !checkError && cloudCheck && cloudCheck.length > 0;
+                            const hasLocalData = state.transactions && state.transactions.length > 0;
+                            
+                            if (!hasCloudData && hasLocalData) {
+                                // 首次登录：云端为空，本地有数据，先上传本地数据
+                                console.log('📤 First-time login: Uploading local data to cloud...');
+                                const uploadResult = await syncManager.syncToCloud();
+                                if (uploadResult.success) {
+                                    console.log('✅ Local data uploaded to cloud');
+                                } else {
+                                    console.warn('⚠️ Failed to upload local data:', uploadResult.error);
+                                }
+                            } else {
+                                // 已有云端数据或本地为空：执行双向合并
+                                console.log('🔄 Pulling data from cloud and merging...');
+                                await syncManager.syncFromCloud();
+                            }
+                            
                             await loadDataFromLocal(); // 重新加载合并后的数据
                             renderAll(); // 刷新UI
-                            console.log('✅ Data pulled from cloud. All devices will show the same data.');
+                            console.log('✅ Data synchronized. All devices will show the same data.');
                         } catch (error) {
-                            console.warn('⚠️ Failed to pull data from cloud:', error);
+                            console.warn('⚠️ Failed to sync data:', error);
                         }
                     }
                 } else {
