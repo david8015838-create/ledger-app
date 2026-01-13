@@ -2152,22 +2152,73 @@
         // ============================================
         // PWA 支持 - 全屏模式
         // ============================================
-        // 防止 iOS Safari 的橡皮筋效果
+        // 防止 iOS Safari 的橡皮筋效果（但允许正常滚动）
         document.addEventListener('touchmove', function(e) {
-            if (e.target.closest('.scrollable')) return;
+            // 检查目标元素及其父元素是否可以滚动
+            let element = e.target;
+            let canScroll = false;
+            
+            // 向上遍历 DOM 树，检查是否有可滚动的父元素
+            while (element && element !== document.body) {
+                const style = window.getComputedStyle(element);
+                const overflowY = style.overflowY;
+                const overflow = style.overflow;
+                
+                // 检查元素是否可以垂直滚动
+                if (overflowY === 'auto' || overflowY === 'scroll' || 
+                    overflow === 'auto' || overflow === 'scroll') {
+                    // 检查元素是否真的可以滚动（内容高度 > 容器高度）
+                    if (element.scrollHeight > element.clientHeight) {
+                        canScroll = true;
+                        break;
+                    }
+                }
+                
+                element = element.parentElement;
+            }
+            
+            // 如果找到可滚动元素，允许滚动
+            if (canScroll) {
+                return;
+            }
+            
+            // 检查主容器是否可以滚动
+            const mainContainer = document.getElementById('mainContainer');
+            if (mainContainer && mainContainer.scrollHeight > mainContainer.clientHeight) {
+                // 如果触摸点在主容器内，允许滚动
+                if (mainContainer.contains(e.target)) {
+                    return;
+                }
+            }
+            
+            // 否则阻止默认行为（防止橡皮筋效果）
             e.preventDefault();
         }, { passive: false });
 
-        // 隐藏地址栏（iOS Safari）
+        // 隐藏地址栏（iOS Safari）- 只在首次加载时执行一次
+        let addressBarHidden = false;
         window.addEventListener('load', function() {
-            setTimeout(function() {
-                window.scrollTo(0, 1);
-            }, 0);
+            if (!addressBarHidden) {
+                setTimeout(function() {
+                    window.scrollTo(0, 1);
+                    addressBarHidden = true;
+                }, 0);
+            }
         });
 
-        // 防止双击缩放
+        // 防止双击缩放 - 只在非交互元素上
         let lastTouchEnd = 0;
         document.addEventListener('touchend', function(e) {
+            // 允许在按钮、输入框等交互元素上双击
+            if (e.target.tagName === 'BUTTON' || 
+                e.target.tagName === 'INPUT' || 
+                e.target.tagName === 'TEXTAREA' ||
+                e.target.closest('button') ||
+                e.target.closest('input') ||
+                e.target.closest('textarea')) {
+                return;
+            }
+            
             const now = Date.now();
             if (now - lastTouchEnd <= 300) {
                 e.preventDefault();
