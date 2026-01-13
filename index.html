@@ -2269,8 +2269,15 @@
                                 syncManager = new SyncManager(localDB, supabaseClient);
                             }
                             
-                            // 不再自动同步，需要用户手动点击同步按钮
-                            console.log('✅ User signed in. Use manual sync button to sync data.');
+                            // 登录后从云端拉取数据（确保所有设备数据一致，但不自动上传）
+                            console.log('🔄 Pulling data from cloud after login to ensure consistency...');
+                            try {
+                                await syncManager.syncFromCloud();
+                                await loadDataFromLocal(); // 重新加载合并后的数据
+                                console.log('✅ Data pulled from cloud. All devices will show the same data.');
+                            } catch (error) {
+                                console.warn('⚠️ Failed to pull data from cloud:', error);
+                            }
                             
                             // 刷新UI
                             renderAll();
@@ -2315,9 +2322,17 @@
                     // 获取最后同步时间
                     syncManager.lastSyncTime = await syncManager.getLastSyncTime();
 
-                    // 不再自动同步，需要用户手动点击同步按钮
+                    // 如果已登录，从云端拉取数据（确保所有设备数据一致，但不自动上传）
                     if (state.isLoggedIn && currentUser) {
-                        console.log('✅ App initialized. Use manual sync button to sync data.');
+                        console.log('🔄 Pulling data from cloud on startup to ensure consistency...');
+                        try {
+                            await syncManager.syncFromCloud();
+                            await loadDataFromLocal(); // 重新加载合并后的数据
+                            renderAll(); // 刷新UI
+                            console.log('✅ Data pulled from cloud. All devices will show the same data.');
+                        } catch (error) {
+                            console.warn('⚠️ Failed to pull data from cloud:', error);
+                        }
                     }
                 } else {
                     console.log('ℹ️ Running in local-only mode (Supabase not configured)');
@@ -3230,10 +3245,19 @@
                 // 清空輸入
                 document.getElementById('loginCode').value = '';
                 
-                // 跳轉到主頁面（不再自动同步）
+                // 跳轉到主頁面（从云端拉取数据，确保所有设备数据一致）
                 setTimeout(async () => {
                     if (syncManager) {
-                        await loadDataFromLocal();
+                        // 从云端拉取数据（确保所有设备数据一致，但不自动上传）
+                        try {
+                            console.log('🔄 Pulling data from cloud after code login to ensure consistency...');
+                            await syncManager.syncFromCloud();
+                            await loadDataFromLocal();
+                            console.log('✅ Data pulled from cloud. All devices will show the same data.');
+                        } catch (error) {
+                            console.warn('⚠️ Failed to pull data from cloud:', error);
+                            await loadDataFromLocal();
+                        }
                     }
                     showMainApp();
                     renderAll();
