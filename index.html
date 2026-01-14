@@ -737,10 +737,12 @@
             border: 3px solid white;
             border-radius: 50%;
             pointer-events: none;
-            transform: translate(-50%, -50%);
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.8), 0 0 20px currentColor, 0 0 30px currentColor;
-            transition: left 0.05s linear, top 0.05s linear, border-color 0.1s ease, box-shadow 0.1s ease;
+            transition: border-color 0.1s ease, box-shadow 0.1s ease, opacity 0.2s ease;
+            will-change: transform, opacity;
             z-index: 10;
+            opacity: 0; /* 初始隱藏 */
+            transform: translate(-50%, -50%); /* 從中心點定位 */
         }
         
         .theme-dot {
@@ -5259,6 +5261,35 @@
             lucide.createIcons();
         }
         
+        // 節流函數 - 限制函數執行頻率
+        function throttle(func, limit) {
+            let inThrottle;
+            return function(...args) {
+                if (!inThrottle) {
+                    func.apply(this, args);
+                    inThrottle = true;
+                    setTimeout(() => inThrottle = false, limit);
+                }
+            };
+        }
+        
+        // 使用 requestAnimationFrame 優化的節流
+        function rafThrottle(func) {
+            let rafId = null;
+            let lastArgs = null;
+            
+            return function(...args) {
+                lastArgs = args;
+                if (rafId === null) {
+                    rafId = requestAnimationFrame(() => {
+                        func.apply(this, lastArgs);
+                        rafId = null;
+                        lastArgs = null;
+                    });
+                }
+            };
+        }
+        
         // 繪製圓形色階選擇器
         function drawColorWheel() {
             const canvas = document.getElementById('themeColorWheel');
@@ -5317,7 +5348,11 @@
             
             ctx.putImageData(imageData, 0, 0);
             
-            // 處理顏色選擇（點擊或拖動）
+            // 緩存最後的顏色值，避免重複計算
+            let lastHex = null;
+            let lastRgb = null;
+            
+            // 處理顏色選擇（點擊或拖動）- 使用節流優化
             const handleColorSelection = (e) => {
                 const rect = canvas.getBoundingClientRect();
                 let x, y;
@@ -5335,7 +5370,11 @@
                 const dy = y - centerY;
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
-                if (distance > outerRadius) return;
+                // 如果移出色輪，隱藏指示器並返回
+                if (distance > outerRadius) {
+                    updateColorIndicator(x, y, null, false);
+                    return;
+                }
                 
                 // 計算角度
                 let angle = Math.atan2(dy, dx);
@@ -5359,12 +5398,23 @@
                 const rgb = hslToRgb(hue / 360, sat / 100, light / 100);
                 const hex = rgbToHex(rgb[0], rgb[1], rgb[2]);
                 
-                // 即時應用主題（拖動時）
-                applyColorTheme(hex, rgb, true); // true 表示即時預覽，不保存
+                // 只有顏色改變時才更新（避免重複計算）
+                if (hex !== lastHex) {
+                    lastHex = hex;
+                    lastRgb = rgb;
+                    
+                    // 即時應用主題（拖動時）- 使用節流
+                    throttledApplyColorTheme(hex, rgb, true);
+                }
                 
-                // 更新指示器位置
-                updateColorIndicator(x, y, hex);
+                // 指示器位置始終更新（更流暢）- 只在色輪內顯示
+                updateColorIndicator(x, y, hex, true);
             };
+            
+            // 使用 requestAnimationFrame 節流的主題應用函數
+            const throttledApplyColorTheme = rafThrottle((hex, rgb, isPreview) => {
+                applyColorTheme(hex, rgb, isPreview);
+            });
             
             // 點擊事件（最終確定選擇）
             canvas.onclick = (e) => {
@@ -5415,6 +5465,17 @@
             canvas.onmousemove = (e) => {
                 if (isDragging) {
                     handleColorSelection(e);
+                } else {
+                    // 滑鼠移動但未按下時，檢查是否在色輪內
+                    const rect = canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const dx = x - centerX;
+                    const dy = y - centerY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance > outerRadius) {
+                        updateColorIndicator(x, y, null, false);
+                    }
                 }
             };
             
@@ -5424,6 +5485,7 @@
             
             canvas.onmouseleave = () => {
                 isDragging = false;
+                updateColorIndicator(0, 0, null, false);
             };
             
             // 觸控事件（移動設備）
@@ -5434,7 +5496,22 @@
             
             canvas.ontouchmove = (e) => {
                 e.preventDefault();
-                handleColorSelection(e);
+                const rect = canvas.getBoundingClientRect();
+                if (e.touches && e.touches.length > 0) {
+                    const x = e.touches[0].clientX - rect.left;
+                    const y = e.touches[0].clientY - rect.top;
+                    const dx = x - centerX;
+                    const dy = y - centerY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance <= outerRadius) {
+                        // 在色輪內，處理顏色選擇
+                        handleColorSelection(e);
+                    } else {
+                        // 移出色輪，隱藏指示器
+                        updateColorIndicator(x, y, null, false);
+                    }
+                }
             };
             
             canvas.ontouchend = (e) => {
@@ -5465,6 +5542,9 @@
                         const rgb = hslToRgb(hue / 360, sat / 100, light / 100);
                         const hex = rgbToHex(rgb[0], rgb[1], rgb[2]);
                         applyColorTheme(hex, rgb, false);
+                    } else {
+                        // 移出色輪，隱藏指示器
+                        updateColorIndicator(x, y, null, false);
                     }
                 }
             };
@@ -5504,7 +5584,7 @@
             }).join("");
         }
         
-        // 應用顏色主題
+        // 應用顏色主題（優化版本）
         async function applyColorTheme(hex, rgb, isPreview = false) {
             const [r, g, b] = rgb;
             const rgbStr = `${r}, ${g}, ${b}`;
@@ -5519,49 +5599,61 @@
             const brightness = (r * 299 + g * 587 + b * 114) / 1000;
             const opacity = brightness > 128 ? 0.7 : 0.5;
             
-            // 即時應用主題（拖動時即時反應）
-            document.documentElement.style.setProperty('--accent', hex);
-            document.documentElement.style.setProperty('--accent-rgb', rgbStr);
-            document.documentElement.style.setProperty('--bg-deep', bg);
-            document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${opacity})`);
-            
-            // 更新預覽
-            const preview = document.getElementById('selectedThemePreview');
-            if (preview) {
-                preview.style.backgroundColor = hex;
-                preview.style.color = brightness > 128 ? '#000' : '#fff';
-                preview.textContent = `已選擇：${hex.toUpperCase()}`;
-            }
-            
-            // 如果是預覽模式（拖動中），不保存，只更新顯示
-            if (isPreview) {
-                // 即時更新圖表（如果存在）
-                if (myChart) {
-                    renderStats();
+            // 使用 requestAnimationFrame 批量更新 DOM（性能優化）
+            requestAnimationFrame(() => {
+                // 即時應用主題（拖動時即時反應）
+                document.documentElement.style.setProperty('--accent', hex);
+                document.documentElement.style.setProperty('--accent-rgb', rgbStr);
+                document.documentElement.style.setProperty('--bg-deep', bg);
+                document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${opacity})`);
+                
+                // 更新預覽
+                const preview = document.getElementById('selectedThemePreview');
+                if (preview) {
+                    preview.style.backgroundColor = hex;
+                    preview.style.color = brightness > 128 ? '#000' : '#fff';
+                    preview.textContent = `已選擇：${hex.toUpperCase()}`;
                 }
-                return;
+            });
+            
+            // 如果是預覽模式（拖動中），不保存，不更新圖表（性能優化）
+            if (isPreview) {
+                return; // 預覽模式下不更新圖表，避免卡頓
             }
             
-            // 最終確定時才保存
+            // 最終確定時才保存和更新圖表
             state.themeId = 'custom';
             state.customTheme = { color: hex, rgb: rgbStr, opacity, bg };
             
-            // 儲存到 IndexedDB
-            await localDB.put('settings', { key: 'themeId', value: 'custom' });
-            await localDB.put('settings', { key: 'customTheme', value: state.customTheme });
+            // 儲存到 IndexedDB（異步，不阻塞）
+            localDB.put('settings', { key: 'themeId', value: 'custom' }).catch(console.error);
+            localDB.put('settings', { key: 'customTheme', value: state.customTheme }).catch(console.error);
             
-            if (myChart) renderStats();
+            // 只在最終確定時更新圖表
+            if (myChart) {
+                requestAnimationFrame(() => {
+                    renderStats();
+                });
+            }
         }
         
-        // 更新顏色指示器位置
-        function updateColorIndicator(x, y, color) {
+        // 更新顏色指示器位置（優化版本）
+        function updateColorIndicator(x, y, color, isVisible = true) {
             const indicator = document.getElementById('themeColorIndicator');
-            if (indicator) {
-                indicator.style.left = x + 'px';
-                indicator.style.top = y + 'px';
-                indicator.style.borderColor = color;
-                indicator.style.boxShadow = `0 0 10px rgba(0, 0, 0, 0.8), 0 0 20px ${color}`;
+            if (!indicator) return;
+            
+            if (!isVisible) {
+                // 隱藏指示器
+                indicator.style.opacity = '0';
+                return;
             }
+            
+            // 顯示指示器並更新位置
+            indicator.style.opacity = '1';
+            indicator.style.left = x + 'px';
+            indicator.style.top = y + 'px';
+            indicator.style.borderColor = color;
+            indicator.style.boxShadow = `0 0 10px rgba(0, 0, 0, 0.8), 0 0 20px ${color}, 0 0 30px ${color}`;
         }
         
         // 更新當前主題的指示器位置
