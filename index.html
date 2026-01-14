@@ -1113,10 +1113,10 @@
                     <i data-lucide="calendar" class="w-5 h-5 text-white/40"></i>
                     <input type="month" id="histMonth" onchange="renderHistory()" class="bg-transparent flex-1 text-white outline-none font-bold">
                 </div>
-                <div class="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4 mb-6">
-                    <i data-lucide="search" class="w-5 h-5 text-white/40"></i>
-                    <input type="text" id="searchKeyword" placeholder="搜尋關鍵字、分類、備註..." oninput="renderHistory()" class="bg-transparent flex-1 text-white outline-none font-bold placeholder-white/30">
-                    <button onclick="clearSearch()" class="px-3 py-1 bg-white/10 rounded-lg text-[9px] font-bold text-white/60">清除</button>
+                <div class="flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl p-3 mb-6">
+                    <i data-lucide="search" class="w-5 h-5 text-white/40 flex-shrink-0"></i>
+                    <input type="text" id="searchKeyword" placeholder="搜尋關鍵字、分類、備註、信用卡..." oninput="renderHistory()" class="bg-transparent flex-1 min-w-0 text-white outline-none font-bold placeholder-white/30 text-sm">
+                    <button onclick="clearSearch()" class="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold text-white/60 flex-shrink-0 whitespace-nowrap">清除</button>
                 </div>
                 <div id="historyAccordion" class="space-y-3"></div>
             </section>
@@ -4384,13 +4384,25 @@
             let filtered = state.transactions.filter(t => t.date.startsWith(month));
             if(filterCategory) filtered = filtered.filter(t => t.category === filterCategory);
             
-            // 搜尋功能
+            // 搜尋功能（包含信用卡名稱）
             const searchKeyword = document.getElementById('searchKeyword')?.value.trim().toLowerCase() || '';
             if (searchKeyword) {
                 filtered = filtered.filter(t => {
                     const note = (t.note || '').toLowerCase();
                     const category = (t.category || '').toLowerCase();
-                    return note.includes(searchKeyword) || category.includes(searchKeyword);
+                    
+                    // 搜尋信用卡名稱
+                    let cardName = '';
+                    if (t.paymentMethod === 'credit' && t.cardId) {
+                        const card = state.cards.find(c => c.id === t.cardId);
+                        if (card) {
+                            cardName = (card.name || '').toLowerCase();
+                        }
+                    }
+                    
+                    return note.includes(searchKeyword) || 
+                           category.includes(searchKeyword) || 
+                           cardName.includes(searchKeyword);
                 });
             }
 
