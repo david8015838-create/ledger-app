@@ -83,6 +83,85 @@
         }
 
         .hidden-page { display: none !important; }
+        
+        /* 摺疊區域過渡效果 */
+        .collapsible-section {
+            transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out, padding 0.3s ease-in-out;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+        
+        .collapsible-section.expanded {
+            max-height: 600px;
+            opacity: 1;
+        }
+        
+        /* 移動端響應式優化 */
+        @media (max-width: 480px) {
+            #app {
+                max-width: 100%;
+            }
+            
+            .glass-panel {
+                margin: 0 4px;
+            }
+            
+            /* Modal 在移動端的優化 */
+            #helpModal > div,
+            #recurringModal > div,
+            #cardModal > div,
+            #paymentModal > div,
+            #cloudInfoModal > div {
+                max-height: calc(100vh - 32px);
+                margin: 16px;
+                padding: 20px !important;
+            }
+            
+            /* 確保內容不會超出螢幕 */
+            main {
+                padding-bottom: 120px !important;
+            }
+            
+            /* 底部導航在移動端的優化 */
+            .nav-dock-container {
+                width: calc(100% - 32px);
+                bottom: 16px;
+            }
+        }
+        
+        /* iOS Safari PWA 模式優化 */
+        @supports (-webkit-touch-callout: none) {
+            #app {
+                height: -webkit-fill-available;
+            }
+            
+            /* 確保 Modal 在 iOS 上正確顯示 */
+            #helpModal,
+            #recurringModal,
+            #cardModal,
+            #paymentModal,
+            #cloudInfoModal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            #helpModal > div,
+            #recurringModal > div,
+            #cardModal > div,
+            #paymentModal > div,
+            #cloudInfoModal > div {
+                margin: 16px;
+                max-height: calc(100vh - 32px);
+            }
+        }
 
         /* Auth Page Styles */
         .auth-tab-active {
@@ -632,6 +711,38 @@
             transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
             opacity: 0;
         }
+        /* 圓形色階選擇器 */
+        #themePicker {
+            position: relative;
+            width: 280px;
+            height: 280px;
+            margin: 0 auto;
+        }
+        
+        #themeColorWheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            cursor: crosshair;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+            touch-action: none; /* 防止觸控時的默認行為（如滾動） */
+            user-select: none; /* 防止文字選擇 */
+        }
+        
+        #themeColorIndicator {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border: 3px solid white;
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.8), 0 0 20px currentColor, 0 0 30px currentColor;
+            transition: left 0.05s linear, top 0.05s linear, border-color 0.1s ease, box-shadow 0.1s ease;
+            z-index: 10;
+        }
+        
         .theme-dot {
             width: 32px;
             height: 32px;
@@ -795,7 +906,7 @@
         <header id="header-ui" class="pt-12 px-8 pb-4 flex justify-between items-start z-20">
             <div class="flex flex-col">
                 <h1 class="brand-title text-3xl font-[900]">LEDGER<span class="text-[14px] font-normal align-top ml-0.5">™</span></h1>
-                <div class="by-owen font-bold mt-1 text-[10px] tracking-wider">DESIGNED BY OWEN  |  V2.0</div>
+                <div class="by-owen font-bold mt-1 text-[10px] tracking-wider">DESIGNED BY OWEN  |  V3.0</div>
             </div>
             <button onclick="nav('settings')" class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mt-1 border border-white/10 hover:border-white/30 transition-colors">
                 <i data-lucide="user" class="w-5 h-5"></i>
@@ -984,6 +1095,8 @@
                     </div>
                 </div>
 
+                <div id="todaySpentDisplay"></div>
+
                 <div>
                     <h3 class="text-[10px] font-black uppercase text-white/30 tracking-widest mb-4 ml-2">Recent Activities</h3>
                     <div id="recentList" class="space-y-3"></div>
@@ -994,9 +1107,14 @@
             </section>
 
             <section id="page-history" class="page-transition hidden-page space-y-4">
-                <div class="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4 mb-6">
+                <div class="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4 mb-4">
                     <i data-lucide="calendar" class="w-5 h-5 text-white/40"></i>
                     <input type="month" id="histMonth" onchange="renderHistory()" class="bg-transparent flex-1 text-white outline-none font-bold">
+                </div>
+                <div class="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4 mb-6">
+                    <i data-lucide="search" class="w-5 h-5 text-white/40"></i>
+                    <input type="text" id="searchKeyword" placeholder="搜尋關鍵字、分類、備註..." oninput="renderHistory()" class="bg-transparent flex-1 text-white outline-none font-bold placeholder-white/30">
+                    <button onclick="clearSearch()" class="px-3 py-1 bg-white/10 rounded-lg text-[9px] font-bold text-white/60">清除</button>
                 </div>
                 <div id="historyAccordion" class="space-y-3"></div>
             </section>
@@ -1016,20 +1134,59 @@
                     </div>
                 </div>
                 <div id="statsLegend" class="grid grid-cols-1 gap-3"></div>
+                
+                <!-- 消費趨勢圖表 -->
+                <div class="glass-panel p-6 rounded-[40px]">
+                    <h3 class="text-[10px] font-black uppercase text-white/40 tracking-widest mb-4">Spending Trends (Last 6 Months)</h3>
+                    <div class="relative w-full" style="height: 200px;">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                    <div id="noTrendData" class="hidden py-10 text-center opacity-30">
+                        <i data-lucide="trending-up" class="w-8 h-8 mx-auto mb-2"></i>
+                        <p class="text-[9px] font-black uppercase tracking-widest">No Trend Data</p>
+                    </div>
+                </div>
             </section>
 
             <section id="page-settings" class="page-transition hidden-page space-y-6">
-                <div class="glass-panel p-6 rounded-3xl space-y-6">
-                    <div>
-                        <h3 class="text-xs font-black uppercase text-white/40 tracking-widest mb-4">Theme Essence</h3>
-                        <div id="themePicker" class="grid grid-cols-4 gap-4"></div>
+                <!-- 幫助按鈕（縮小版，放在最上面） -->
+                <button onclick="showHelpModal()" class="w-full glass-panel p-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-white/5 transition-all">
+                    <i data-lucide="help-circle" class="w-4 h-4 text-purple-400"></i>
+                    <span class="text-xs font-bold text-white/80">功能說明</span>
+                </button>
+                
+                <!-- 主題設定（摺疊式） -->
+                <div class="glass-panel rounded-3xl overflow-hidden">
+                    <button onclick="toggleThemeSection()" class="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-all">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="palette" class="w-4 h-4 text-white/60"></i>
+                            <h3 class="text-xs font-black uppercase text-white/40 tracking-widest">Theme Essence</h3>
+                        </div>
+                        <i data-lucide="chevron-down" id="themeChevron" class="w-4 h-4 text-white/40 transition-transform"></i>
+                    </button>
+                    <div id="themeSection" class="collapsible-section px-6">
+                        <div id="themePicker" class="pb-6 pt-4">
+                            <canvas id="themeColorWheel"></canvas>
+                            <div id="themeColorIndicator"></div>
+                        </div>
+                        <div class="text-center mt-4">
+                            <div id="selectedThemePreview" class="inline-block px-4 py-2 rounded-xl text-xs font-bold"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="glass-panel p-6 rounded-3xl space-y-4">
-                    <h3 class="text-xs font-black uppercase text-white/40 tracking-widest">Currency Setting</h3>
-                    <div class="space-y-2">
-                        <p class="text-[10px] text-white/40 font-bold ml-1">選擇顯示的幣值：</p>
-                        <div id="currencyPicker" class="grid grid-cols-3 gap-3"></div>
+                
+                <!-- 幣值設定（摺疊式） -->
+                <div class="glass-panel rounded-3xl overflow-hidden">
+                    <button onclick="toggleCurrencySection()" class="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-all">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="dollar-sign" class="w-4 h-4 text-white/60"></i>
+                            <h3 class="text-xs font-black uppercase text-white/40 tracking-widest">Currency Setting</h3>
+                        </div>
+                        <i data-lucide="chevron-down" id="currencyChevron" class="w-4 h-4 text-white/40 transition-transform"></i>
+                    </button>
+                    <div id="currencySection" class="collapsible-section px-6 space-y-2">
+                        <p class="text-[10px] text-white/40 font-bold ml-1 pt-2">選擇顯示的幣值：</p>
+                        <div id="currencyPicker" class="grid grid-cols-3 gap-3 pb-6"></div>
                     </div>
                 </div>
                 <div class="glass-panel p-6 rounded-3xl space-y-4">
@@ -1038,7 +1195,7 @@
                         <p class="text-[10px] text-white/40 font-bold ml-1">在此設定您的每月消費預算上限：</p>
                         <input type="number" id="budgetInput" placeholder="輸入每月預算金額" class="w-full bg-white/5 p-4 rounded-2xl outline-none text-white font-bold border border-white/5 focus:border-white/20">
                     </div>
-                    <button onclick="saveSettings()" class="w-full py-4 dynamic-accent-bg text-black rounded-2xl font-black shadow-lg">儲存預算變更</button>
+                    <button onclick="saveSettings(event)" class="w-full py-4 dynamic-accent-bg text-black rounded-2xl font-black shadow-lg">儲存預算變更</button>
                 </div>
 
                 <!-- 帳戶與雲端同步狀態 -->
@@ -1113,6 +1270,15 @@
                         <button onclick="openCardModal()" class="text-[10px] bg-white/10 px-3 py-1 rounded-full">+ 新增</button>
                     </div>
                     <div id="settingsCardList" class="space-y-2"></div>
+                </div>
+
+                <!-- 定期交易管理 -->
+                <div class="glass-panel p-6 rounded-3xl space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xs font-black uppercase text-white/40 tracking-widest">Recurring Transactions</h3>
+                        <button onclick="openRecurringModal()" class="text-[10px] bg-white/10 px-3 py-1 rounded-full">+ 新增</button>
+                    </div>
+                    <div id="settingsRecurringList" class="space-y-2"></div>
                 </div>
             </section>
 
@@ -1244,6 +1410,203 @@
             </div>
         </div>
 
+        <!-- 定期交易 Modal -->
+        <div id="recurringModal" class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 hidden">
+            <div class="glass-panel w-full max-w-sm rounded-[40px] p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+                <h2 class="text-xl font-black" id="recurringModalTitle">新增定期交易</h2>
+                <input type="text" id="recurringNote" placeholder="備註（例如：房租）" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                <div>
+                    <label class="text-[10px] font-bold text-white/40 uppercase mb-2 block">金額</label>
+                    <input type="number" id="recurringAmount" placeholder="例如：15000" min="0" step="0.01" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-white/40 uppercase mb-2 block">分類</label>
+                    <select id="recurringCategory" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                        <!-- 動態生成 -->
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-white/40 uppercase mb-2 block">頻率</label>
+                    <select id="recurringFrequency" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                        <option value="daily">每日</option>
+                        <option value="weekly">每週</option>
+                        <option value="monthly" selected>每月</option>
+                        <option value="yearly">每年</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-white/40 uppercase mb-2 block">開始日期</label>
+                    <input type="date" id="recurringStartDate" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-white/40 uppercase mb-2 block">結束日期（選填）</label>
+                    <input type="date" id="recurringEndDate" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                    <p class="text-[8px] text-white/30 mt-1">留空表示永久有效</p>
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-white/40 uppercase mb-2 block">支付方式</label>
+                    <select id="recurringPaymentMethod" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                        <option value="cash">現金</option>
+                        <option value="credit">信用卡</option>
+                    </select>
+                </div>
+                <div id="recurringCardSelectContainer" class="hidden">
+                    <label class="text-[10px] font-bold text-white/40 uppercase mb-2 block">信用卡</label>
+                    <select id="recurringCardSelect" class="w-full bg-white/5 p-4 rounded-2xl outline-none font-bold border border-white/5 text-white">
+                        <!-- 動態生成 -->
+                    </select>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="closeRecurringModal()" class="flex-1 py-4 glass-panel rounded-2xl font-bold">取消</button>
+                    <button id="confirmRecurringBtn" onclick="confirmAddRecurring()" class="flex-1 py-4 dynamic-accent-bg text-black rounded-2xl font-black">確認</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 完整功能說明 Modal -->
+        <div id="helpModal" class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 hidden">
+            <div class="glass-panel w-full max-w-md rounded-[40px] p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between mb-4 sticky top-0 bg-[var(--card-bg)] pb-4 border-b border-white/10">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+                            <i data-lucide="help-circle" class="w-6 h-6 text-purple-400"></i>
+                        </div>
+                        <h2 class="text-xl font-black">功能說明</h2>
+                    </div>
+                    <button onclick="closeHelpModal()" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4 text-sm">
+                    <!-- 首頁功能 -->
+                    <div class="bg-white/5 rounded-2xl p-4 space-y-2">
+                        <h3 class="font-black text-white mb-2 flex items-center gap-2">
+                            <i data-lucide="home" class="w-4 h-4"></i>
+                            首頁功能
+                        </h3>
+                        <div class="space-y-2 text-xs text-white/70">
+                            <p><strong class="text-white">預算顯示：</strong>顯示本月剩餘預算、已花費金額和總預算。液體高度代表預算使用率。</p>
+                            <p><strong class="text-white">今日消費：</strong>顯示今天的現金消費總額和交易筆數，幫助您控制每日支出。</p>
+                            <p><strong class="text-white">本月待繳信用卡費：</strong>顯示本月需要繳納的信用卡帳單總額，包含分期付款和結轉餘額。</p>
+                            <p><strong class="text-white">最近活動：</strong>顯示最近的交易記錄，方便快速查看。</p>
+                        </div>
+                    </div>
+
+                    <!-- 新增交易 -->
+                    <div class="bg-white/5 rounded-2xl p-4 space-y-2">
+                        <h3 class="font-black text-white mb-2 flex items-center gap-2">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                            新增交易
+                        </h3>
+                        <div class="space-y-2 text-xs text-white/70">
+                            <p><strong class="text-white">金額輸入：</strong>點擊中間的 + 按鈕，輸入交易金額。</p>
+                            <p><strong class="text-white">幣種選擇：</strong>支援台幣(TWD)、美元(USD)、新加坡幣(SGD)，會自動轉換為您設定的主要幣種。</p>
+                            <p><strong class="text-white">分類選擇：</strong>選擇交易分類，可在設定中新增自訂分類。</p>
+                            <p><strong class="text-white">支付方式：</strong>
+                                <br>• <strong>現金：</strong>立即計入當月支出
+                                <br>• <strong>信用卡：</strong>可選擇信用卡、設定分期期數和年利率，會在繳款月份計入支出</p>
+                            <p><strong class="text-white">分期付款：</strong>設定分期期數和年利率，系統會自動計算每期金額。餘數會放在最後一期。</p>
+                            <p><strong class="text-white">備註：</strong>可輸入交易備註，方便日後查找。</p>
+                        </div>
+                    </div>
+
+                    <!-- 歷史記錄 -->
+                    <div class="bg-white/5 rounded-2xl p-4 space-y-2">
+                        <h3 class="font-black text-white mb-2 flex items-center gap-2">
+                            <i data-lucide="calendar" class="w-4 h-4"></i>
+                            歷史記錄
+                        </h3>
+                        <div class="space-y-2 text-xs text-white/70">
+                            <p><strong class="text-white">月份選擇：</strong>選擇要查看的月份，顯示該月所有交易。</p>
+                            <p><strong class="text-white">搜尋功能：</strong>在搜尋框輸入關鍵字，可搜尋備註或分類名稱，即時過濾結果。</p>
+                            <p><strong class="text-white">日期分組：</strong>交易按日期分組顯示，點擊日期卡片可展開/收起該日交易。</p>
+                            <p><strong class="text-white">編輯/刪除：</strong>點擊交易項目可編輯或刪除該筆交易。</p>
+                        </div>
+                    </div>
+
+                    <!-- 統計分析 -->
+                    <div class="bg-white/5 rounded-2xl p-4 space-y-2">
+                        <h3 class="font-black text-white mb-2 flex items-center gap-2">
+                            <i data-lucide="pie-chart" class="w-4 h-4"></i>
+                            統計分析
+                        </h3>
+                        <div class="space-y-2 text-xs text-white/70">
+                            <p><strong class="text-white">圓餅圖：</strong>顯示該月各分類的支出比例，包含現金消費和信用卡消費。</p>
+                            <p><strong class="text-white">分類明細：</strong>點擊分類項目可跳轉到歷史記錄查看該分類的所有交易。</p>
+                            <p><strong class="text-white">趨勢圖表：</strong>顯示最近6個月的消費趨勢，幫助您了解支出變化。滑鼠懸停可查看詳細金額。</p>
+                            <p><strong class="text-white">月份切換：</strong>可切換不同月份查看歷史統計。</p>
+                        </div>
+                    </div>
+
+                    <!-- 信用卡管理 -->
+                    <div class="bg-white/5 rounded-2xl p-4 space-y-2">
+                        <h3 class="font-black text-white mb-2 flex items-center gap-2">
+                            <i data-lucide="credit-card" class="w-4 h-4"></i>
+                            信用卡管理
+                        </h3>
+                        <div class="space-y-2 text-xs text-white/70">
+                            <p><strong class="text-white">新增信用卡：</strong>設定信用卡名稱、結帳日、繳款間隔天數。可選填初始未繳清餘額（使用App前已存在的欠款）。</p>
+                            <p><strong class="text-white">結帳日：</strong>每月幾號結帳，用於計算帳單月份。</p>
+                            <p><strong class="text-white">繳款間隔：</strong>結帳後幾天內需要繳款。</p>
+                            <p><strong class="text-white">初始餘額：</strong>使用App前已存在的未繳清帳單，系統會正確追蹤還款進度，不會重複計算。</p>
+                            <p><strong class="text-white">記錄還款：</strong>點擊「還款」按鈕記錄還款金額，系統會自動更新剩餘欠款。</p>
+                            <p><strong class="text-white">分期計算：</strong>分期付款會自動分配到各期帳單，餘數放在最後一期。</p>
+                        </div>
+                    </div>
+
+                    <!-- 定期交易 -->
+                    <div class="bg-white/5 rounded-2xl p-4 space-y-2">
+                        <h3 class="font-black text-white mb-2 flex items-center gap-2">
+                            <i data-lucide="repeat" class="w-4 h-4"></i>
+                            定期交易
+                        </h3>
+                        <div class="space-y-2 text-xs text-white/70">
+                            <p><strong class="text-white">功能說明：</strong>設定固定支出（如房租、電話費），系統會在到期時自動建立交易。</p>
+                            <p><strong class="text-white">頻率設定：</strong>支援每日、每週、每月、每年四種頻率。</p>
+                            <p><strong class="text-white">日期設定：</strong>設定開始日期和結束日期（可選），留空表示永久有效。</p>
+                            <p><strong class="text-white">自動建立：</strong>每次開啟App時，系統會檢查並自動建立到期的定期交易。</p>
+                            <p><strong class="text-white">支付方式：</strong>可設定為現金或信用卡支付。</p>
+                        </div>
+                    </div>
+
+                    <!-- 設定功能 -->
+                    <div class="bg-white/5 rounded-2xl p-4 space-y-2">
+                        <h3 class="font-black text-white mb-2 flex items-center gap-2">
+                            <i data-lucide="settings" class="w-4 h-4"></i>
+                            設定功能
+                        </h3>
+                        <div class="space-y-2 text-xs text-white/70">
+                            <p><strong class="text-white">主題切換：</strong>選擇不同的視覺主題，改變App的顏色風格。</p>
+                            <p><strong class="text-white">幣種設定：</strong>設定主要顯示幣種，所有金額會轉換為此幣種顯示。</p>
+                            <p><strong class="text-white">預算設定：</strong>設定每月消費預算上限，系統會追蹤預算使用情況。</p>
+                            <p><strong class="text-white">分類管理：</strong>新增、編輯、刪除交易分類，自訂分類圖示和顏色。</p>
+                            <p><strong class="text-white">雲端同步：</strong>登入帳戶後可同步資料到雲端，方便跨裝置使用。本地資料永久保留。</p>
+                        </div>
+                    </div>
+
+                    <!-- 使用技巧 -->
+                    <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4 space-y-2">
+                        <h3 class="font-black text-yellow-400 mb-2 flex items-center gap-2">
+                            <i data-lucide="lightbulb" class="w-4 h-4"></i>
+                            使用技巧
+                        </h3>
+                        <div class="space-y-2 text-xs text-yellow-400/80">
+                            <p>• 定期記錄交易，保持資料完整性</p>
+                            <p>• 使用搜尋功能快速找到特定交易</p>
+                            <p>• 定期查看統計分析，了解消費模式</p>
+                            <p>• 設定定期交易，自動記錄固定支出</p>
+                            <p>• 善用分類功能，方便日後分析</p>
+                            <p>• 信用卡分期會自動分配到各期帳單</p>
+                            <p>• 記錄還款後，系統會自動更新剩餘欠款</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <button onclick="closeHelpModal()" class="w-full py-4 dynamic-accent-bg text-black rounded-2xl font-black mt-4">我知道了</button>
+            </div>
+        </div>
+
         <!-- 雲端說明 Modal -->
         <div id="cloudInfoModal" class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 hidden">
             <div class="glass-panel w-full max-w-md rounded-[40px] p-8 space-y-6">
@@ -1366,7 +1729,15 @@
             { id: 'crimson', color: '#ef4444', rgb: '239, 68, 68', opacity: 0.5, bg: '#0d0202' },
             { id: 'candy', color: '#ec4899', rgb: '236, 72, 153', opacity: 0.5, bg: '#0d0208' },
             { id: 'royal', color: '#8b5cf6', rgb: '139, 92, 246', opacity: 0.5, bg: '#08020d' },
-            { id: 'cyan', color: '#06b6d4', rgb: '6, 182, 212', opacity: 0.5, bg: '#020c0d' }
+            { id: 'cyan', color: '#06b6d4', rgb: '6, 182, 212', opacity: 0.5, bg: '#020c0d' },
+            { id: 'ocean', color: '#3b82f6', rgb: '59, 130, 246', opacity: 0.5, bg: '#020510' },
+            { id: 'emerald', color: '#14b8a6', rgb: '20, 184, 166', opacity: 0.5, bg: '#020d0b' },
+            { id: 'amber', color: '#fbbf24', rgb: '251, 191, 36', opacity: 0.6, bg: '#0d0a02' },
+            { id: 'rose', color: '#f43f5e', rgb: '244, 63, 94', opacity: 0.5, bg: '#0d0204' },
+            { id: 'indigo', color: '#4f46e5', rgb: '79, 70, 229', opacity: 0.5, bg: '#03020d' },
+            { id: 'teal', color: '#0d9488', rgb: '13, 148, 136', opacity: 0.5, bg: '#020a09' },
+            { id: 'orange', color: '#fb923c', rgb: '251, 146, 60', opacity: 0.6, bg: '#0d0702' },
+            { id: 'violet', color: '#a855f7', rgb: '168, 85, 247', opacity: 0.5, bg: '#0a020d' }
         ];
 
         const CURRENCY_OPTIONS = [
@@ -2060,6 +2431,7 @@
         let state = {
             budget: 30000,
             themeId: 'minimal',
+            customTheme: null, // 自訂主題：{ color, rgb, opacity, bg }
             currency: 'TWD',
             transactions: [],
             categories: [
@@ -2069,7 +2441,8 @@
                 { name: "帳單雜項", icon: "🧾", color: "#8b5cf6" },
                 { name: "休閒娛樂", icon: "🎮", color: "#ec4899" }
             ],
-            cards: [], // 信用卡列表：{ id, name, closingDay, dueDaysAfter, carryingBalance, initialBalance }
+            cards: [], // 信用卡列表：{ id, name, closingDay, dueDaysAfter, carryingBalance, initialBalance, totalRepaid, creditLimit }
+            recurringTransactions: [], // 定期交易：{ id, amount, category, paymentMethod, cardId, frequency, startDate, endDate, lastCreated, note }
             editingId: null,
             tempCat: "美食餐飲",
             tempCurrency: null,
@@ -2078,6 +2451,11 @@
             tempCardId: null, // 选中的信用卡 ID
             tempInstallments: 1, // 分期期数，默认1
             tempInterestRate: 0, // 年利率（%），默认0
+            // 搜尋相關狀態
+            searchKeyword: '',
+            searchCategory: null,
+            searchDateStart: null,
+            searchDateEnd: null,
             isOnline: navigator.onLine,
             lastSyncTime: null,
             syncError: null
@@ -2120,20 +2498,46 @@
                     }
                 }
 
+                // 加载定期交易数据
+                const recurringData = localStorage.getItem('ledger_recurring_v1');
+                if (recurringData) {
+                    try {
+                        state.recurringTransactions = JSON.parse(recurringData);
+                    } catch (e) {
+                        console.warn('Failed to parse recurring transactions data:', e);
+                        state.recurringTransactions = [];
+                    }
+                }
+
                 // 載入設定
                 const budgetSetting = await localDB.get('settings', 'budget');
                 const themeSetting = await localDB.get('settings', 'themeId');
                 const currencySetting = await localDB.get('settings', 'currency');
+                const customThemeSetting = await localDB.get('settings', 'customTheme');
 
                 if (budgetSetting) state.budget = budgetSetting.value;
                 if (themeSetting) state.themeId = themeSetting.value;
                 if (currencySetting) state.currency = currencySetting.value;
+                if (customThemeSetting) state.customTheme = customThemeSetting.value;
+                
+                // 應用主題
+                if (state.customTheme) {
+                    document.documentElement.style.setProperty('--accent', state.customTheme.color);
+                    document.documentElement.style.setProperty('--accent-rgb', state.customTheme.rgb);
+                    document.documentElement.style.setProperty('--bg-deep', state.customTheme.bg);
+                    document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${state.customTheme.opacity})`);
+                } else {
+                    applyTheme(state.themeId);
+                }
 
                 // 加载同步元数据
                 const lastSync = await localDB.get('sync_metadata', 'lastSyncTime');
                 if (lastSync) state.lastSyncTime = new Date(lastSync.value);
 
                 console.log(`✅ Loaded ${state.transactions.length} transactions, ${state.categories.length} categories`);
+                
+                // 處理定期交易（自動建立到期的交易）
+                await processRecurringTransactions();
                 
                 // 迁移旧的 localStorage 数据（仅首次）
                 await migrateFromLocalStorage();
@@ -2145,6 +2549,98 @@
             }
         }
 
+        // ============================================
+        // 定期交易處理
+        // ============================================
+        
+        // 判斷是否應該建立定期交易
+        function shouldCreateRecurringTransaction(recurring, today) {
+            if (!recurring.startDate) return false;
+            
+            const startDate = new Date(recurring.startDate);
+            if (today < startDate) return false;
+            
+            if (recurring.endDate) {
+                const endDate = new Date(recurring.endDate);
+                if (today > endDate) return false;
+            }
+            
+            if (!recurring.lastCreated) return true;
+            
+            const lastCreated = new Date(recurring.lastCreated);
+            const daysDiff = Math.floor((today - lastCreated) / (1000 * 60 * 60 * 24));
+            
+            switch (recurring.frequency) {
+                case 'daily': return daysDiff >= 1;
+                case 'weekly': return daysDiff >= 7;
+                case 'monthly': 
+                    return today.getMonth() !== lastCreated.getMonth() || 
+                           today.getFullYear() !== lastCreated.getFullYear();
+                case 'yearly':
+                    return today.getFullYear() !== lastCreated.getFullYear();
+                default: return false;
+            }
+        }
+        
+        // 處理定期交易，自動建立到期的交易
+        async function processRecurringTransactions() {
+            const today = new Date();
+            const todayStr = today.toISOString().slice(0, 10);
+            let hasNewTransactions = false;
+            
+            for (const recurring of state.recurringTransactions) {
+                if (!shouldCreateRecurringTransaction(recurring, today)) {
+                    continue;
+                }
+                
+                // 檢查今天是否已經建立過這筆定期交易
+                const alreadyCreated = state.transactions.some(t => 
+                    t.isRecurring && 
+                    t.recurringId === recurring.id && 
+                    t.date === todayStr
+                );
+                
+                if (alreadyCreated) {
+                    continue;
+                }
+                
+                // 建立交易
+                const category = state.categories.find(c => c.name === recurring.category) || state.categories[0];
+                const transaction = {
+                    id: Date.now() + Math.random(),
+                    amount: recurring.amount,
+                    note: recurring.note || `${recurring.category} (定期)`,
+                    date: todayStr,
+                    category: recurring.category,
+                    icon: category.icon,
+                    color: category.color,
+                    currency: state.currency,
+                    paymentMethod: recurring.paymentMethod || 'cash',
+                    cardId: recurring.cardId || null,
+                    installments: 1,
+                    interestRate: 0,
+                    isRecurring: true,
+                    recurringId: recurring.id,
+                    createdAt: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+                
+                state.transactions.push(transaction);
+                await localDB.put('transactions', transaction);
+                
+                // 更新最後建立時間
+                recurring.lastCreated = today.toISOString();
+                hasNewTransactions = true;
+                
+                console.log(`✅ Created recurring transaction: ${recurring.note || recurring.category}`);
+            }
+            
+            // 如果有新交易，更新 localStorage
+            if (hasNewTransactions) {
+                localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
+            }
+        }
+        
         // 迁移旧的 localStorage 数据到 IndexedDB（仅首次运行）
         async function migrateFromLocalStorage() {
             const migrated = await localDB.get('sync_metadata', 'localStorage_migrated');
@@ -2236,6 +2732,9 @@
                 await localDB.put('settings', { key: 'budget', value: state.budget });
                 await localDB.put('settings', { key: 'themeId', value: state.themeId });
                 await localDB.put('settings', { key: 'currency', value: state.currency });
+                if (state.customTheme) {
+                    await localDB.put('settings', { key: 'customTheme', value: state.customTheme });
+                }
                 // 保存设置更新时间戳
                 await localDB.put('settings', { key: 'settings_updated_at', value: now });
                 
@@ -2275,6 +2774,7 @@
 
         let lastPage = 'home';
         let myChart = null;
+        let trendChart = null;
 
         function getCurrencySymbol() {
             const curr = CURRENCY_OPTIONS.find(c => c.id === state.currency);
@@ -2318,7 +2818,7 @@
                 } else if (syncManager.isSyncing) {
                     statusBadge.innerHTML = '<span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full">同步中...</span>';
                 } else if (syncManager.syncError) {
-                    statusBadge.innerHTML = '<span class="bg-red-500/20 text-red-400 px-2 py-1 rounded-full">同步失败</span>';
+                    statusBadge.innerHTML = '<span class="bg-red-500/20 text-red-400 px-2 py-1 rounded-full">同步失敗</span>';
                 } else if (syncManager.lastSyncTime && syncManager.hasSyncedThisSession) {
                     // 只有在本会话中成功同步过才显示"已同步"
                     statusBadge.innerHTML = '<span class="bg-green-500/20 text-green-400 px-2 py-1 rounded-full">已同步</span>';
@@ -2493,7 +2993,7 @@
                     console.log('✅ UI refreshed');
                     
                     // 显示成功提示
-                    alert('✅ 同步完成！所有更改已通过双向合并保存到云端。');
+                    alert('✅ 同步完成！所有更改已透過雙向合併儲存到雲端。');
                 } else {
                     console.warn('⚠️ Manual sync failed:', result.error);
                     
@@ -2511,7 +3011,7 @@
                         }
                     }
                     
-                    alert('⚠️ 同步失败：' + (result.error || '未知错误') + '\n\n本地更改已撤销。');
+                    alert('⚠️ 同步失敗：' + (result.error || '未知錯誤') + '\n\n本地更改已撤銷。');
                 }
             } catch (error) {
                 console.error('❌ Manual sync error:', error);
@@ -2530,7 +3030,7 @@
                     }
                 }
                 
-                alert('❌ 同步出错：' + (error.message || '未知错误') + '\n\n本地更改已撤销。');
+                alert('❌ 同步出錯：' + (error.message || '未知錯誤') + '\n\n本地更改已撤銷。');
             } finally {
                 clearTimeout(manualSyncTimeout);
                 // 确保同步状态被重置
@@ -3012,6 +3512,7 @@
         async function applyTheme(themeId) {
             const scheme = THEME_SCHEMES.find(s => s.id === themeId) || THEME_SCHEMES[0];
             state.themeId = themeId;
+            state.customTheme = null; // 清除自訂主題
             document.documentElement.style.setProperty('--accent', scheme.color);
             document.documentElement.style.setProperty('--accent-rgb', scheme.rgb);
             document.documentElement.style.setProperty('--bg-deep', scheme.bg);
@@ -3328,8 +3829,8 @@
             
             const amounts = [];
             for (let i = 0; i < installments; i++) {
-                // 第一期加上余数
-                amounts.push(i === 0 ? perPeriodAmount + remainder : perPeriodAmount);
+                // 餘數放在最後一期（符合實際銀行做法）
+                amounts.push(i === installments - 1 ? perPeriodAmount + remainder : perPeriodAmount);
             }
             
             return amounts;
@@ -3358,10 +3859,10 @@
             // 每期利息 = 原始本金 * 月利率（简单利息计算）
             const perPeriodInterest = principal * monthlyRate;
             
-            // 处理除不尽金额：将总本金与计算后的各期本金差额，并入第一期
+            // 处理除不尽金额：将总本金与计算后的各期本金差额，并入最後一期（符合實際銀行做法）
             const perPeriodPrincipal = [];
             for (let i = 0; i < installments; i++) {
-                if (i === 0) {
+                if (i === installments - 1) {
                     perPeriodPrincipal.push(perPeriodPrincipalBase + principalRemainder);
                 } else {
                     perPeriodPrincipal.push(perPeriodPrincipalBase);
@@ -3548,13 +4049,15 @@
                 }
             });
             
-            // 加上结转余额和初始欠款
+            // 加上结转余额和初始欠款（修復：初始餘額扣除已還款）
             state.cards.forEach(card => {
                 const carryingBalance = card.carryingBalance || 0;
                 const initialBalance = card.initialBalance || 0;
+                const totalRepaid = card.totalRepaid || 0;
                 
-                // 初始欠款：始终计入当前月的应缴账单（因为它是已存在的欠款）
-                if (initialBalance > 0) {
+                // 初始欠款：扣除已還款金額（修復重複計算 BUG）
+                const remainingInitialBalance = Math.max(0, initialBalance - totalRepaid);
+                if (remainingInitialBalance > 0) {
                     if (!cardBills[card.id]) {
                         cardBills[card.id] = {
                             card: card,
@@ -3564,8 +4067,8 @@
                         };
                     }
                     // 初始欠款计入应缴总额和利息类别
-                    cardBills[card.id].amount += initialBalance;
-                    cardBills[card.id].interest += initialBalance;
+                    cardBills[card.id].amount += remainingInitialBalance;
+                    cardBills[card.id].interest += remainingInitialBalance;
                 }
                 
                 // 加上结转余额
@@ -3645,6 +4148,35 @@
                     `;
                 } else {
                     creditCardDueEl.innerHTML = '';
+                }
+            }
+            
+            // 計算今日消費
+            const todayStr = now.toISOString().slice(0, 10);
+            const todayTransactions = state.transactions.filter(t => t.date === todayStr);
+            const todaySpent = todayTransactions
+                .filter(t => {
+                    const paymentMethod = t.paymentMethod || 'cash';
+                    return paymentMethod === 'cash';
+                })
+                .reduce((acc, curr) => {
+                    const txCurrency = curr.currency || state.currency;
+                    return acc + convertCurrency(curr.amount, txCurrency, state.currency);
+                }, 0);
+            
+            // 顯示今日消費
+            const todaySpentEl = document.getElementById('todaySpentDisplay');
+            if (todaySpentEl) {
+                if (todaySpent > 0) {
+                    todaySpentEl.innerHTML = `
+                        <div class="glass-panel p-4 rounded-2xl mb-4">
+                            <div class="text-[9px] font-bold text-white/40 uppercase tracking-wider mb-1">今日消費</div>
+                            <div class="text-lg font-black text-white">${symbol}${Math.round(todaySpent).toLocaleString()}</div>
+                            <div class="text-[8px] text-white/30 mt-1">${todayTransactions.filter(t => (t.paymentMethod || 'cash') === 'cash').length} 筆交易</div>
+                        </div>
+                    `;
+                } else {
+                    todaySpentEl.innerHTML = '';
                 }
             }
             
@@ -3849,6 +4381,16 @@
             const month = document.getElementById('histMonth').value;
             let filtered = state.transactions.filter(t => t.date.startsWith(month));
             if(filterCategory) filtered = filtered.filter(t => t.category === filterCategory);
+            
+            // 搜尋功能
+            const searchKeyword = document.getElementById('searchKeyword')?.value.trim().toLowerCase() || '';
+            if (searchKeyword) {
+                filtered = filtered.filter(t => {
+                    const note = (t.note || '').toLowerCase();
+                    const category = (t.category || '').toLowerCase();
+                    return note.includes(searchKeyword) || category.includes(searchKeyword);
+                });
+            }
 
             const groups = {};
             filtered.forEach(t => {
@@ -3928,6 +4470,11 @@
         }
 
         function toggleAccordion(card) { card.classList.toggle('open'); }
+        
+        function clearSearch() {
+            document.getElementById('searchKeyword').value = '';
+            renderHistory();
+        }
 
         function renderStats() {
             const month = document.getElementById('statsMonth').value;
@@ -4117,6 +4664,190 @@
                     <span class="text-xs font-black">${symbol}${Math.round(val).toLocaleString()}</span>
                 </div>`;
             }).join('');
+            
+            // 渲染趨勢圖表（最近6個月）
+            renderTrendChart();
+        }
+        
+        // 渲染消費趨勢圖表
+        function renderTrendChart() {
+            const trendChartEl = document.getElementById('trendChart');
+            const noTrendDataEl = document.getElementById('noTrendData');
+            
+            // 計算最近6個月的消費
+            const now = new Date();
+            const months = [];
+            const spending = [];
+            
+            for (let i = 5; i >= 0; i--) {
+                const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                months.push(`${date.getFullYear()}/${date.getMonth() + 1}`);
+                
+                // 計算該月的總支出
+                let monthTotal = 0;
+                
+                // 現金消費
+                state.transactions.filter(t => {
+                    const paymentMethod = t.paymentMethod || 'cash';
+                    return paymentMethod === 'cash' && t.date.startsWith(monthStr);
+                }).forEach(t => {
+                    const txCurrency = t.currency || state.currency;
+                    monthTotal += convertCurrency(t.amount, txCurrency, state.currency);
+                });
+                
+                // 信用卡當月應繳
+                const creditCardBill = calculateCreditCardBillForMonth(monthStr);
+                monthTotal += creditCardBill.total;
+                
+                spending.push(Math.round(monthTotal));
+            }
+            
+            if (spending.every(s => s === 0)) {
+                trendChartEl.classList.add('hidden');
+                noTrendDataEl.classList.remove('hidden');
+                if (trendChart) trendChart.destroy();
+                return;
+            }
+            
+            trendChartEl.classList.remove('hidden');
+            noTrendDataEl.classList.add('hidden');
+            
+            const ctx = trendChartEl.getContext('2d');
+            if (trendChart) trendChart.destroy();
+            
+            const symbol = getCurrencySymbol();
+            trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: months,
+                    datasets: [{
+                        label: 'Monthly Spending',
+                        data: spending,
+                        borderColor: 'rgba(255, 255, 255, 0.8)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointBackgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        pointBorderColor: 'rgba(255, 255, 255, 1)',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255, 255, 255, 0.2)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return `${symbol}${context.parsed.y.toLocaleString()}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                font: { size: 10 },
+                                callback: function(value) {
+                                    return symbol + value.toLocaleString();
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                font: { size: 10 }
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 計算指定月份的信用卡帳單
+        function calculateCreditCardBillForMonth(monthStr) {
+            const [year, month] = monthStr.split('-').map(Number);
+            const result = { total: 0, byCard: {} };
+            
+            state.cards.forEach(card => {
+                let cardTotal = 0;
+                let cardPrincipal = 0;
+                let cardInterest = 0;
+                
+                // 處理分期交易
+                state.transactions.forEach(tx => {
+                    if (tx.paymentMethod === 'credit' && tx.cardId === card.id && tx.billingMonth && tx.installments && tx.installments > 1) {
+                        const installmentDetails = getInstallmentAmountForMonth(tx, monthStr);
+                        if (installmentDetails.total > 0) {
+                            cardTotal += installmentDetails.total;
+                            cardPrincipal += installmentDetails.principal;
+                            cardInterest += installmentDetails.interest;
+                        }
+                    } else if (tx.paymentMethod === 'credit' && tx.cardId === card.id) {
+                        const dueDate = calculateCreditCardDueDate(tx.date, card);
+                        if (dueDate) {
+                            const dueYear = dueDate.getFullYear();
+                            const dueMonth = dueDate.getMonth() + 1;
+                            const dueMonthStr = `${dueYear}-${String(dueMonth).padStart(2, '0')}`;
+                            if (dueMonthStr === monthStr) {
+                                const txCurrency = tx.currency || state.currency;
+                                const convertedAmount = convertCurrency(tx.amount, txCurrency, state.currency);
+                                cardTotal += convertedAmount;
+                                cardPrincipal += convertedAmount;
+                            }
+                        }
+                    }
+                });
+                
+                // 處理初始餘額和結轉餘額（僅當月）
+                const isCurrentMonth = monthStr === new Date().toISOString().slice(0, 7);
+                if (isCurrentMonth) {
+                    const initialBalance = card.initialBalance || 0;
+                    const totalRepaid = card.totalRepaid || 0;
+                    const remainingInitialBalance = Math.max(0, initialBalance - totalRepaid);
+                    if (remainingInitialBalance > 0) {
+                        cardTotal += remainingInitialBalance;
+                        cardInterest += remainingInitialBalance;
+                    }
+                    
+                    const carryingBalance = card.carryingBalance || 0;
+                    if (carryingBalance > 0) {
+                        cardTotal += carryingBalance;
+                        cardInterest += carryingBalance;
+                    }
+                }
+                
+                if (cardTotal > 0) {
+                    result.byCard[card.id] = {
+                        card: card,
+                        amount: cardTotal,
+                        principal: cardPrincipal,
+                        interest: cardInterest
+                    };
+                    result.total += cardTotal;
+                }
+            });
+            
+            return result;
         }
 
         function prepareAdd() {
@@ -4126,11 +4857,16 @@
             state.tempPaymentMethod = 'cash'; // 預設現金
             state.tempCardId = null;
             state.tempInstallments = 1; // 預設1期
+            state.tempInterestRate = 0; // 預設0%利率
             document.getElementById('formAmount').value = ""; 
             document.getElementById('formNote').value = "";
             document.getElementById('formDate').value = new Date().toISOString().slice(0, 10);
             document.getElementById('formInstallments').value = "1";
+            document.getElementById('formInterestRate').value = "0"; // 重置年利率為0
             document.getElementById('deleteBtn').classList.add('hidden');
+            // 隱藏分期試算預覽
+            const previewEl = document.getElementById('installmentPreview');
+            if (previewEl) previewEl.classList.add('hidden');
             renderFormCurrencyGrid();
             renderFormCatGrid();
             renderPaymentMethod();
@@ -4146,11 +4882,16 @@
             state.tempPaymentMethod = tx.paymentMethod || 'cash'; // 相容舊資料，預設現金
             state.tempCardId = tx.cardId || null;
             state.tempInstallments = tx.installments || 1; // 相容舊資料，預設1期
+            state.tempInterestRate = tx.interestRate || 0; // 相容舊資料，預設0%利率
             document.getElementById('formAmount').value = tx.amount;
             document.getElementById('formNote').value = tx.note;
             document.getElementById('formDate').value = tx.date;
             document.getElementById('formInstallments').value = state.tempInstallments;
+            document.getElementById('formInterestRate').value = state.tempInterestRate; // 設定年利率
             document.getElementById('deleteBtn').classList.remove('hidden');
+            // 隱藏分期試算預覽（會在 renderPaymentMethod 後重新計算）
+            const previewEl = document.getElementById('installmentPreview');
+            if (previewEl) previewEl.classList.add('hidden');
             renderFormCurrencyGrid();
             renderFormCatGrid();
             renderPaymentMethod();
@@ -4413,7 +5154,10 @@
 
         function renderSettings() {
             document.getElementById('budgetInput').value = state.budget;
-            document.getElementById('themePicker').innerHTML = THEME_SCHEMES.map(s => `<div onclick="applyTheme('${s.id}').then(() => renderSettings())" class="theme-dot ${state.themeId === s.id ? 'active' : ''}" style="background-color: ${s.color}; color: ${s.color}"></div>`).join('');
+            
+            // 繪製圓形色階選擇器
+            drawColorWheel();
+            
             document.getElementById('currencyPicker').innerHTML = CURRENCY_OPTIONS.map(c => `
                 <button onclick="changeCurrency('${c.id}')" class="flex flex-col items-center p-4 rounded-2xl transition-all ${state.currency === c.id ? 'dynamic-accent-bg text-black' : 'bg-white/5 text-white/50 hover:bg-white/10'}" type="button">
                     <span class="text-2xl mb-1">${c.flag}</span>
@@ -4470,12 +5214,402 @@
                 }).join('')
                 : '<div class="text-center py-4 text-white/20 text-xs">尚未新增信用卡</div>';
             
+            // 渲染定期交易列表
+            const frequencyMap = { daily: '每日', weekly: '每週', monthly: '每月', yearly: '每年' };
+            document.getElementById('settingsRecurringList').innerHTML = state.recurringTransactions.length > 0
+                ? state.recurringTransactions.map(recurring => {
+                    const symbol = getCurrencySymbol();
+                    const category = state.categories.find(c => c.name === recurring.category) || state.categories[0];
+                    const nextDate = recurring.lastCreated ? new Date(recurring.lastCreated) : new Date(recurring.startDate);
+                    if (recurring.frequency === 'monthly') {
+                        nextDate.setMonth(nextDate.getMonth() + 1);
+                    } else if (recurring.frequency === 'weekly') {
+                        nextDate.setDate(nextDate.getDate() + 7);
+                    } else if (recurring.frequency === 'daily') {
+                        nextDate.setDate(nextDate.getDate() + 1);
+                    } else if (recurring.frequency === 'yearly') {
+                        nextDate.setFullYear(nextDate.getFullYear() + 1);
+                    }
+                    
+                    return `
+                    <div class="p-3 bg-white/5 rounded-xl space-y-2">
+                        <div class="flex justify-between items-center">
+                            <div class="flex-1">
+                                <div class="text-[11px] font-bold text-white">${category.icon} ${recurring.note || recurring.category}</div>
+                                <div class="text-[9px] text-white/40">${symbol}${Math.round(recurring.amount).toLocaleString()} · ${frequencyMap[recurring.frequency]}</div>
+                                <div class="text-[9px] text-white/40">下次：${nextDate.toISOString().slice(0, 10)}</div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="deleteRecurring('${recurring.id}')" class="p-2 bg-white/10 rounded-lg">
+                                    <i data-lucide="trash-2" class="w-3 h-3 text-white/20"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                }).join('')
+                : '<div class="text-center py-4 text-white/20 text-xs">尚未新增定期交易</div>';
+            
             // 更新登入狀態显示
             updateAuthUI();
             
             // 更新同步状态
             updateSyncUI();
             
+            lucide.createIcons();
+        }
+        
+        // 繪製圓形色階選擇器
+        function drawColorWheel() {
+            const canvas = document.getElementById('themeColorWheel');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const size = 280;
+            canvas.width = size;
+            canvas.height = size;
+            
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const outerRadius = size / 2 - 10;
+            const innerRadius = outerRadius * 0.4;
+            
+            // 繪製色輪（從外圈到內圈）
+            const imageData = ctx.createImageData(size, size);
+            const data = imageData.data;
+            
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const dx = x - centerX;
+                    const dy = y - centerY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const index = (y * size + x) * 4;
+                    
+                    if (distance > outerRadius) {
+                        // 外圈之外：透明
+                        data[index + 3] = 0;
+                    } else if (distance < innerRadius) {
+                        // 內圈：灰色漸變（亮度選擇）
+                        const ratio = distance / innerRadius;
+                        const gray = Math.round(255 * (1 - ratio));
+                        data[index] = gray;
+                        data[index + 1] = gray;
+                        data[index + 2] = gray;
+                        data[index + 3] = 255;
+                    } else {
+                        // 外圈：色相和飽和度
+                        let angle = Math.atan2(dy, dx);
+                        if (angle < 0) angle += Math.PI * 2;
+                        const hue = (angle / (Math.PI * 2)) * 360;
+                        
+                        const normalizedDist = (distance - innerRadius) / (outerRadius - innerRadius);
+                        const sat = 100 - normalizedDist * 20; // 外圈飽和度較高
+                        const light = 50 + normalizedDist * 20; // 從50%到70%
+                        
+                        const rgb = hslToRgb(hue / 360, sat / 100, light / 100);
+                        data[index] = rgb[0];
+                        data[index + 1] = rgb[1];
+                        data[index + 2] = rgb[2];
+                        data[index + 3] = 255;
+                    }
+                }
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+            
+            // 處理顏色選擇（點擊或拖動）
+            const handleColorSelection = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                let x, y;
+                
+                // 支援滑鼠和觸控
+                if (e.touches && e.touches.length > 0) {
+                    x = e.touches[0].clientX - rect.left;
+                    y = e.touches[0].clientY - rect.top;
+                } else {
+                    x = e.clientX - rect.left;
+                    y = e.clientY - rect.top;
+                }
+                
+                const dx = x - centerX;
+                const dy = y - centerY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance > outerRadius) return;
+                
+                // 計算角度
+                let angle = Math.atan2(dy, dx);
+                if (angle < 0) angle += Math.PI * 2;
+                const hue = (angle / (Math.PI * 2)) * 360;
+                
+                // 計算飽和度和亮度
+                let sat, light;
+                if (distance < innerRadius) {
+                    // 中心區域：灰色（調整亮度）
+                    sat = 0;
+                    light = 100 - (distance / innerRadius) * 100;
+                } else {
+                    // 外圈：彩色（調整飽和度）
+                    const normalizedDist = (distance - innerRadius) / (outerRadius - innerRadius);
+                    sat = 100 - normalizedDist * 20;
+                    light = 50 + normalizedDist * 20;
+                }
+                
+                // 轉換為 RGB
+                const rgb = hslToRgb(hue / 360, sat / 100, light / 100);
+                const hex = rgbToHex(rgb[0], rgb[1], rgb[2]);
+                
+                // 即時應用主題（拖動時）
+                applyColorTheme(hex, rgb, true); // true 表示即時預覽，不保存
+                
+                // 更新指示器位置
+                updateColorIndicator(x, y, hex);
+            };
+            
+            // 點擊事件（最終確定選擇）
+            canvas.onclick = (e) => {
+                handleColorSelection(e);
+                // 最終保存
+                const rect = canvas.getBoundingClientRect();
+                let x, y;
+                if (e.touches && e.touches.length > 0) {
+                    x = e.touches[0].clientX - rect.left;
+                    y = e.touches[0].clientY - rect.top;
+                } else {
+                    x = e.clientX - rect.left;
+                    y = e.clientY - rect.top;
+                }
+                const dx = x - centerX;
+                const dy = y - centerY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance > outerRadius) return;
+                
+                let angle = Math.atan2(dy, dx);
+                if (angle < 0) angle += Math.PI * 2;
+                const hue = (angle / (Math.PI * 2)) * 360;
+                
+                let sat, light;
+                if (distance < innerRadius) {
+                    sat = 0;
+                    light = 100 - (distance / innerRadius) * 100;
+                } else {
+                    const normalizedDist = (distance - innerRadius) / (outerRadius - innerRadius);
+                    sat = 100 - normalizedDist * 20;
+                    light = 50 + normalizedDist * 20;
+                }
+                
+                const rgb = hslToRgb(hue / 360, sat / 100, light / 100);
+                const hex = rgbToHex(rgb[0], rgb[1], rgb[2]);
+                
+                // 最終保存
+                applyColorTheme(hex, rgb, false);
+            };
+            
+            // 滑鼠移動事件（拖動時即時反應）
+            let isDragging = false;
+            canvas.onmousedown = (e) => {
+                isDragging = true;
+                handleColorSelection(e);
+            };
+            
+            canvas.onmousemove = (e) => {
+                if (isDragging) {
+                    handleColorSelection(e);
+                }
+            };
+            
+            canvas.onmouseup = () => {
+                isDragging = false;
+            };
+            
+            canvas.onmouseleave = () => {
+                isDragging = false;
+            };
+            
+            // 觸控事件（移動設備）
+            canvas.ontouchstart = (e) => {
+                e.preventDefault();
+                handleColorSelection(e);
+            };
+            
+            canvas.ontouchmove = (e) => {
+                e.preventDefault();
+                handleColorSelection(e);
+            };
+            
+            canvas.ontouchend = (e) => {
+                e.preventDefault();
+                // 最終保存
+                const rect = canvas.getBoundingClientRect();
+                if (e.changedTouches && e.changedTouches.length > 0) {
+                    const x = e.changedTouches[0].clientX - rect.left;
+                    const y = e.changedTouches[0].clientY - rect.top;
+                    const dx = x - centerX;
+                    const dy = y - centerY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance <= outerRadius) {
+                        let angle = Math.atan2(dy, dx);
+                        if (angle < 0) angle += Math.PI * 2;
+                        const hue = (angle / (Math.PI * 2)) * 360;
+                        
+                        let sat, light;
+                        if (distance < innerRadius) {
+                            sat = 0;
+                            light = 100 - (distance / innerRadius) * 100;
+                        } else {
+                            const normalizedDist = (distance - innerRadius) / (outerRadius - innerRadius);
+                            sat = 100 - normalizedDist * 20;
+                            light = 50 + normalizedDist * 20;
+                        }
+                        
+                        const rgb = hslToRgb(hue / 360, sat / 100, light / 100);
+                        const hex = rgbToHex(rgb[0], rgb[1], rgb[2]);
+                        applyColorTheme(hex, rgb, false);
+                    }
+                }
+            };
+            
+            // 更新當前主題的指示器位置
+            updateCurrentThemeIndicator();
+        }
+        
+        // HSL 轉 RGB
+        function hslToRgb(h, s, l) {
+            let r, g, b;
+            if (s === 0) {
+                r = g = b = l;
+            } else {
+                const hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1/6) return p + (q - p) * 6 * t;
+                    if (t < 1/2) return q;
+                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                    return p;
+                };
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1/3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1/3);
+            }
+            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+        }
+        
+        // RGB 轉 Hex
+        function rgbToHex(r, g, b) {
+            return "#" + [r, g, b].map(x => {
+                const hex = x.toString(16);
+                return hex.length === 1 ? "0" + hex : hex;
+            }).join("");
+        }
+        
+        // 應用顏色主題
+        async function applyColorTheme(hex, rgb, isPreview = false) {
+            const [r, g, b] = rgb;
+            const rgbStr = `${r}, ${g}, ${b}`;
+            
+            // 計算背景色（較暗的版本）
+            const bgR = Math.max(0, Math.min(15, Math.floor(r * 0.05)));
+            const bgG = Math.max(0, Math.min(15, Math.floor(g * 0.05)));
+            const bgB = Math.max(0, Math.min(15, Math.floor(b * 0.05)));
+            const bg = `#${bgR.toString(16).padStart(2, '0')}${bgG.toString(16).padStart(2, '0')}${bgB.toString(16).padStart(2, '0')}`;
+            
+            // 計算透明度
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            const opacity = brightness > 128 ? 0.7 : 0.5;
+            
+            // 即時應用主題（拖動時即時反應）
+            document.documentElement.style.setProperty('--accent', hex);
+            document.documentElement.style.setProperty('--accent-rgb', rgbStr);
+            document.documentElement.style.setProperty('--bg-deep', bg);
+            document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${opacity})`);
+            
+            // 更新預覽
+            const preview = document.getElementById('selectedThemePreview');
+            if (preview) {
+                preview.style.backgroundColor = hex;
+                preview.style.color = brightness > 128 ? '#000' : '#fff';
+                preview.textContent = `已選擇：${hex.toUpperCase()}`;
+            }
+            
+            // 如果是預覽模式（拖動中），不保存，只更新顯示
+            if (isPreview) {
+                // 即時更新圖表（如果存在）
+                if (myChart) {
+                    renderStats();
+                }
+                return;
+            }
+            
+            // 最終確定時才保存
+            state.themeId = 'custom';
+            state.customTheme = { color: hex, rgb: rgbStr, opacity, bg };
+            
+            // 儲存到 IndexedDB
+            await localDB.put('settings', { key: 'themeId', value: 'custom' });
+            await localDB.put('settings', { key: 'customTheme', value: state.customTheme });
+            
+            if (myChart) renderStats();
+        }
+        
+        // 更新顏色指示器位置
+        function updateColorIndicator(x, y, color) {
+            const indicator = document.getElementById('themeColorIndicator');
+            if (indicator) {
+                indicator.style.left = x + 'px';
+                indicator.style.top = y + 'px';
+                indicator.style.borderColor = color;
+                indicator.style.boxShadow = `0 0 10px rgba(0, 0, 0, 0.8), 0 0 20px ${color}`;
+            }
+        }
+        
+        // 更新當前主題的指示器位置
+        function updateCurrentThemeIndicator() {
+            const currentScheme = THEME_SCHEMES.find(s => s.id === state.themeId);
+            if (currentScheme && !state.customTheme) {
+                // 如果有預設主題，可以顯示在色輪上
+                // 這裡暫時不顯示，因為色輪是連續的色階
+            }
+        }
+        
+        // 摺疊/展開功能
+        function toggleThemeSection() {
+            const section = document.getElementById('themeSection');
+            const chevron = document.getElementById('themeChevron');
+            if (!section || !chevron) return;
+            
+            const isExpanded = section.classList.contains('expanded');
+            if (isExpanded) {
+                section.classList.remove('expanded');
+                chevron.style.transform = 'rotate(0deg)';
+            } else {
+                section.classList.add('expanded');
+                chevron.style.transform = 'rotate(180deg)';
+                // 展開時重新繪製色輪（等待動畫完成）
+                setTimeout(() => {
+                    const canvas = document.getElementById('themeColorWheel');
+                    if (canvas) {
+                        drawColorWheel();
+                    }
+                }, 350);
+            }
+            lucide.createIcons();
+        }
+        
+        function toggleCurrencySection() {
+            const section = document.getElementById('currencySection');
+            const chevron = document.getElementById('currencyChevron');
+            if (!section || !chevron) return;
+            
+            const isExpanded = section.classList.contains('expanded');
+            if (isExpanded) {
+                section.classList.remove('expanded');
+                chevron.style.transform = 'rotate(0deg)';
+            } else {
+                section.classList.add('expanded');
+                chevron.style.transform = 'rotate(180deg)';
+            }
             lucide.createIcons();
         }
 
@@ -4520,13 +5654,47 @@
             renderHome();
         }
 
-        async function saveSettings() {
-            state.budget = parseFloat(document.getElementById('budgetInput').value) || state.budget;
+        async function saveSettings(event) {
+            const budgetInput = document.getElementById('budgetInput');
+            const newBudget = parseFloat(budgetInput.value);
+            
+            if (!newBudget || newBudget <= 0) {
+                alert('請輸入有效的預算金額');
+                return;
+            }
+            
+            state.budget = newBudget;
             await save();
             
             // 不再自动同步，需要用户手动点击同步按钮
+            // 不跳回主畫面，保持在設定頁面
             
-            nav('home');
+            // 顯示成功回饋
+            const btn = event?.target || document.querySelector('button[onclick*="saveSettings"]');
+            if (btn) {
+                const originalText = btn.innerText;
+                const originalClass = btn.className;
+                
+                // 更新按鈕樣式
+                btn.innerText = '✓ 已儲存';
+                btn.className = originalClass.replace('dynamic-accent-bg', 'bg-green-500');
+                btn.style.transform = 'scale(0.95)';
+                
+                // 添加成功動畫
+                setTimeout(() => {
+                    btn.style.transform = 'scale(1)';
+                }, 100);
+                
+                // 2秒後恢復
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.className = originalClass;
+                    btn.style.transform = '';
+                }, 2000);
+            }
+            
+            // 更新首頁顯示（如果需要的話）
+            renderHome();
         }
         
         function openCatModal() { 
@@ -4669,6 +5837,155 @@
             renderSettings();
         }
         
+        // ============================================
+        // 定期交易管理
+        // ============================================
+        
+        let editingRecurringId = null;
+        
+        function openRecurringModal(recurringId = null) {
+            editingRecurringId = recurringId;
+            const modal = document.getElementById('recurringModal');
+            const title = document.getElementById('recurringModalTitle');
+            const noteInput = document.getElementById('recurringNote');
+            const amountInput = document.getElementById('recurringAmount');
+            const categorySelect = document.getElementById('recurringCategory');
+            const frequencySelect = document.getElementById('recurringFrequency');
+            const startDateInput = document.getElementById('recurringStartDate');
+            const endDateInput = document.getElementById('recurringEndDate');
+            const paymentMethodSelect = document.getElementById('recurringPaymentMethod');
+            const cardSelectContainer = document.getElementById('recurringCardSelectContainer');
+            const cardSelect = document.getElementById('recurringCardSelect');
+            
+            if (recurringId) {
+                const recurring = state.recurringTransactions.find(r => r.id === recurringId);
+                if (recurring) {
+                    title.innerText = '編輯定期交易';
+                    noteInput.value = recurring.note || '';
+                    amountInput.value = recurring.amount;
+                    categorySelect.value = recurring.category;
+                    frequencySelect.value = recurring.frequency;
+                    startDateInput.value = recurring.startDate;
+                    endDateInput.value = recurring.endDate || '';
+                    paymentMethodSelect.value = recurring.paymentMethod || 'cash';
+                }
+            } else {
+                title.innerText = '新增定期交易';
+                noteInput.value = '';
+                amountInput.value = '';
+                categorySelect.value = state.categories[0].name;
+                frequencySelect.value = 'monthly';
+                startDateInput.value = new Date().toISOString().slice(0, 10);
+                endDateInput.value = '';
+                paymentMethodSelect.value = 'cash';
+            }
+            
+            // 填充分類選單
+            categorySelect.innerHTML = state.categories.map(c => 
+                `<option value="${c.name}">${c.icon} ${c.name}</option>`
+            ).join('');
+            
+            // 填充信用卡選單
+            if (state.cards.length > 0) {
+                cardSelect.innerHTML = '<option value="">請選擇信用卡</option>' + 
+                    state.cards.map(card => `<option value="${card.id}">${card.name}</option>`).join('');
+            } else {
+                cardSelect.innerHTML = '<option value="">請先在設定中新增信用卡</option>';
+            }
+            
+            // 顯示/隱藏信用卡選擇
+            if (paymentMethodSelect.value === 'credit') {
+                cardSelectContainer.classList.remove('hidden');
+            } else {
+                cardSelectContainer.classList.add('hidden');
+            }
+            
+            // 監聽支付方式變化
+            paymentMethodSelect.onchange = () => {
+                if (paymentMethodSelect.value === 'credit') {
+                    cardSelectContainer.classList.remove('hidden');
+                } else {
+                    cardSelectContainer.classList.add('hidden');
+                }
+            };
+            
+            modal.classList.remove('hidden');
+        }
+        
+        function closeRecurringModal() {
+            document.getElementById('recurringModal').classList.add('hidden');
+            editingRecurringId = null;
+        }
+        
+        async function confirmAddRecurring() {
+            const note = document.getElementById('recurringNote').value.trim();
+            const amount = parseFloat(document.getElementById('recurringAmount').value);
+            const category = document.getElementById('recurringCategory').value;
+            const frequency = document.getElementById('recurringFrequency').value;
+            const startDate = document.getElementById('recurringStartDate').value;
+            const endDate = document.getElementById('recurringEndDate').value || null;
+            const paymentMethod = document.getElementById('recurringPaymentMethod').value;
+            const cardId = paymentMethod === 'credit' ? (document.getElementById('recurringCardSelect').value || null) : null;
+            
+            if (!note) {
+                alert('請輸入備註');
+                return;
+            }
+            if (!amount || amount <= 0) {
+                alert('請輸入有效的金額');
+                return;
+            }
+            if (!startDate) {
+                alert('請選擇開始日期');
+                return;
+            }
+            
+            if (editingRecurringId) {
+                const index = state.recurringTransactions.findIndex(r => r.id === editingRecurringId);
+                if (index !== -1) {
+                    state.recurringTransactions[index] = {
+                        ...state.recurringTransactions[index],
+                        note,
+                        amount,
+                        category,
+                        frequency,
+                        startDate,
+                        endDate,
+                        paymentMethod,
+                        cardId
+                    };
+                }
+            } else {
+                const recurring = {
+                    id: Date.now(),
+                    note,
+                    amount,
+                    category,
+                    frequency,
+                    startDate,
+                    endDate,
+                    paymentMethod,
+                    cardId,
+                    lastCreated: null
+                };
+                state.recurringTransactions.push(recurring);
+            }
+            
+            localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
+            await processRecurringTransactions();
+            renderSettings();
+            renderHome();
+            closeRecurringModal();
+        }
+        
+        async function deleteRecurring(recurringId) {
+            if (!confirm('確定要刪除此定期交易嗎？')) return;
+            
+            state.recurringTransactions = state.recurringTransactions.filter(r => r.id !== recurringId);
+            localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
+            renderSettings();
+        }
+        
         // 还款功能
         let paymentCardId = null;
         
@@ -4716,6 +6033,10 @@
             
             const cardIndex = state.cards.findIndex(c => c.id === paymentCardId);
             if (cardIndex !== -1) {
+                // 更新已還款總額（修復初始餘額重複計算 BUG）
+                const currentRepaid = state.cards[cardIndex].totalRepaid || 0;
+                state.cards[cardIndex].totalRepaid = currentRepaid + paymentAmount;
+                
                 if (remaining > 0) {
                     // 有剩余，更新结转余额（累加到下月）
                     state.cards[cardIndex].carryingBalance = remaining;
@@ -4737,13 +6058,23 @@
             }
         }
         
-        function showCloudInfoModal() { 
+        function showCloudInfoModal() {
             document.getElementById('cloudInfoModal').classList.remove('hidden'); 
             lucide.createIcons(); // 重新渲染圖示
         }
         
-        function closeCloudInfoModal() { 
+        function closeCloudInfoModal() {
             document.getElementById('cloudInfoModal').classList.add('hidden'); 
+        }
+        
+        // 幫助說明 Modal
+        function showHelpModal() {
+            document.getElementById('helpModal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+        
+        function closeHelpModal() {
+            document.getElementById('helpModal').classList.add('hidden');
         }
 
         // ============================================
