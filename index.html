@@ -684,6 +684,13 @@
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            /* 防止溢出 */
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
         }
         
         input[type="date"]:hover, input[type="month"]:hover {
@@ -1156,12 +1163,14 @@
                     </div>
                 </div>
                 
-                <div class="glass-panel p-6 rounded-[32px] space-y-4">
-                    <div class="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center">
-                        <div class="flex-1 min-w-0 sm:min-w-[140px]">
-                            <input type="date" id="formDate" class="w-full text-white font-bold outline-none">
+                <div class="glass-panel p-6 rounded-[32px] space-y-4 overflow-hidden">
+                    <div class="flex flex-col gap-4">
+                        <div class="w-full">
+                            <input type="date" id="formDate" class="w-full text-white font-bold outline-none box-border max-w-full">
                         </div>
-                        <input type="text" id="formNote" placeholder="輸入備註..." class="flex-1 sm:flex-[2] bg-transparent text-white font-bold outline-none text-left sm:text-right min-w-0 max-w-full">
+                        <div class="w-full">
+                            <input type="text" id="formNote" placeholder="輸入備註..." class="w-full bg-white/5 p-4 rounded-2xl text-white font-bold outline-none border border-white/5 box-border">
+                        </div>
                     </div>
                 </div>
                 <div class="flex gap-4">
