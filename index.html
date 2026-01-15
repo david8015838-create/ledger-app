@@ -2077,10 +2077,44 @@
                         });
 
                         console.log(`📤 Uploading ${txData.length} transactions to cloud...`);
-                        const { error: txError } = await this.supabaseClient
-                            .from('transactions')
-                            .upsert(txData, { onConflict: 'id' });
-
+                        
+                        // 嘗試上傳，如果失敗且是因為 billing_month 欄位不存在，則重試不包含該欄位
+                        let txError = null;
+                        let uploadAttempt = 0;
+                        const maxAttempts = 2;
+                        
+                        while (uploadAttempt < maxAttempts) {
+                            try {
+                                const { error } = await this.supabaseClient
+                                    .from('transactions')
+                                    .upsert(txData, { onConflict: 'id' });
+                                
+                                if (!error) {
+                                    // 成功，跳出循環
+                                    break;
+                                }
+                                
+                                // 如果是 billing_month 欄位錯誤，移除該欄位後重試
+                                if (error.code === 'PGRST204' && error.message && error.message.includes('billing_month')) {
+                                    console.warn('⚠️ billing_month column not found, retrying without it...');
+                                    // 移除所有交易的 billing_month 欄位
+                                    txData = txData.map(tx => {
+                                        const { billing_month, ...rest } = tx;
+                                        return rest;
+                                    });
+                                    uploadAttempt++;
+                                    continue;
+                                }
+                                
+                                // 其他錯誤，直接拋出
+                                txError = error;
+                                break;
+                            } catch (err) {
+                                txError = err;
+                                break;
+                            }
+                        }
+                        
                         if (txError) {
                             console.error('❌ Failed to upload transactions to cloud:', txError);
                             console.error('❌ Error code:', txError.code);
