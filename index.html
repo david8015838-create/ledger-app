@@ -2048,23 +2048,33 @@
                     // 先更新云端：上传完整的合并数据（包括已删除的和信用卡字段）
                     // 只有在云端更新成功后才更新本地，避免数据不一致
                     if (mergedTransactions.length > 0) {
-                        const txData = mergedTransactions.map(tx => ({
-                            id: tx.id,
-                            user_id: currentUser.id,
-                            amount: tx.amount,
-                            date: tx.date,
-                            note: tx.note || '',
-                            category: tx.category,
-                            icon: tx.icon,
-                            currency: tx.currency || 'TWD',
-                            payment_method: tx.paymentMethod || tx.payment_method || 'cash',
-                            card_id: tx.cardId || tx.card_id || null,
-                            installments: tx.installments || 1,
-                            interest_rate: tx.interestRate || tx.interest_rate || 0,
-                            billing_month: tx.billingMonth || tx.billing_month || null,
-                            updated_at: tx.updated_at,
-                            is_deleted: tx.is_deleted || false
-                        }));
+                        // 構建交易數據，只包含存在的欄位
+                        const txData = mergedTransactions.map(tx => {
+                            const data = {
+                                id: tx.id,
+                                user_id: currentUser.id,
+                                amount: tx.amount,
+                                date: tx.date,
+                                note: tx.note || '',
+                                category: tx.category,
+                                icon: tx.icon,
+                                currency: tx.currency || 'TWD',
+                                payment_method: tx.paymentMethod || tx.payment_method || 'cash',
+                                card_id: tx.cardId || tx.card_id || null,
+                                installments: tx.installments || 1,
+                                interest_rate: tx.interestRate || tx.interest_rate || 0,
+                                updated_at: tx.updated_at,
+                                is_deleted: tx.is_deleted || false
+                            };
+                            
+                            // 只有在有值時才添加 billing_month（避免欄位不存在錯誤）
+                            const billingMonth = tx.billingMonth || tx.billing_month;
+                            if (billingMonth) {
+                                data.billing_month = billingMonth;
+                            }
+                            
+                            return data;
+                        });
 
                         console.log(`📤 Uploading ${txData.length} transactions to cloud...`);
                         const { error: txError } = await this.supabaseClient
