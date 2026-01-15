@@ -2588,8 +2588,12 @@
                         console.log(`✅ Pulled ${categories.length} categories from cloud`);
                     }
 
-                    // 处理信用卡数据
+                    // 处理信用卡数据（双向合并）
+                    const localCardsData = localStorage.getItem('ledger_cards_v13');
+                    const localCards = localCardsData ? JSON.parse(localCardsData) : [];
+                    
                     if (creditCards && creditCards.length > 0) {
+                        // 云端有数据：使用云端数据（因为云端数据更新）
                         state.cards = creditCards.map(card => ({
                             id: card.id,
                             name: card.name,
@@ -2603,9 +2607,22 @@
                         localStorage.setItem('ledger_cards_v13', JSON.stringify(state.cards));
                         console.log(`✅ Pulled ${creditCards.length} credit cards from cloud`);
                     } else if (creditCards && creditCards.length === 0) {
-                        // 如果云端没有信用卡数据，清空本地（但保留本地如果有的话，使用双向合并逻辑）
-                        // 这里不强制清空，因为可能本地有未同步的数据
-                        console.log('ℹ️ No credit cards in cloud');
+                        // 云端没有数据：保留本地数据（如果本地有的话）
+                        if (localCards && localCards.length > 0) {
+                            state.cards = localCards;
+                            console.log(`ℹ️ No credit cards in cloud, keeping ${localCards.length} local cards`);
+                        } else {
+                            state.cards = [];
+                            console.log('ℹ️ No credit cards in cloud or local');
+                        }
+                    } else {
+                        // creditCards 为 null 或 undefined：保留本地数据
+                        if (localCards && localCards.length > 0) {
+                            state.cards = localCards;
+                            console.log(`ℹ️ Failed to fetch credit cards, keeping ${localCards.length} local cards`);
+                        } else {
+                            state.cards = [];
+                        }
                     }
 
                     if (settings) {
@@ -2646,12 +2663,22 @@
                             state.themeId = settings.theme_id;
                             state.currency = settings.currency;
                             
-                            console.log('✅ Pulled user settings from cloud (updated, including custom theme)');
+                            // 同时保存到 localStorage 作为备份
+                            localStorage.setItem('ledger_budget_v13', state.budget);
+                            localStorage.setItem('ledger_theme_id_v13', state.themeId);
+                            localStorage.setItem('ledger_currency_v13', state.currency);
+                            localStorage.setItem('ledger_settings_updated_at_v13', cloudUpdatedAt);
+                            
+                            console.log('✅ Pulled user settings from cloud (updated, including custom theme and budget)');
                         } else {
                             console.log('✅ Local settings are newer, keeping local version');
                         }
                     }
 
+                    // 确保所有数据都已保存（调用 save 函数来持久化）
+                    // 注意：这里不直接调用 save()，因为 save() 会触发同步，造成循环
+                    // 但我们已经手动保存了所有数据到 IndexedDB 和 localStorage
+                    
                     return { success: true };
 
                 } catch (error) {
@@ -3613,6 +3640,7 @@
                                     await syncManager.syncFromCloud();
                                     // 重新加载合并后的数据
                                     await loadDataFromLocal();
+                                    renderAll();
                                 }
                                 
                                 console.log(`✅ Data synchronized. Showing ${state.transactions.length} transactions.`);
@@ -3724,6 +3752,7 @@
                                         await syncManager.syncFromCloud();
                                         // 重新加载合并后的数据
                                         await loadDataFromLocal();
+                                        renderAll();
                                     }
                                     
                                     console.log(`✅ Data synchronized. Showing ${state.transactions.length} transactions.`);
