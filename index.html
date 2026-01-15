@@ -1220,7 +1220,7 @@
                             <span id="userEmail" class="text-white/80 font-bold truncate ml-2"></span>
                         </div>
                         <div class="flex gap-2">
-                            <button id="authActionBtn" onclick="showAuthPage()" class="flex-1 py-3 bg-gradient-to-r from-white/20 to-white/10 border border-white/20 text-white rounded-2xl font-black text-xs transition-all hover:border-white/40">
+                            <button id="authActionBtn" class="flex-1 py-3 bg-gradient-to-r from-white/20 to-white/10 border border-white/20 text-white rounded-2xl font-black text-xs transition-all hover:border-white/40">
                                 🔐 登入雲端帳戶
                             </button>
                             <button onclick="showCloudInfoModal()" class="w-12 h-12 bg-white/10 border border-white/20 text-white rounded-2xl font-black text-xs transition-all hover:border-white/40 flex items-center justify-center">
@@ -4143,6 +4143,13 @@
 
         async function handleSignOut() {
             if (!supabaseClient) return;
+            
+            // 二次确认
+            const confirmed = confirm('確定要登出嗎？\n\n登出後將無法同步資料到雲端，但本地資料會保留。');
+            if (!confirmed) {
+                console.log('❌ User cancelled sign out');
+                return;
+            }
             
             try {
                 const { error } = await supabaseClient.auth.signOut();
