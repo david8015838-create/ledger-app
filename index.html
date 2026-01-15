@@ -2223,23 +2223,46 @@
                         }
                     }
 
-                    // 3. 同步使用者設定
+                    // 3. 同步使用者設定（优先使用 state 中的值，确保是最新的）
+                    // 先确保 state 中的值已保存到数据库
+                    const now = new Date().toISOString();
+                    if (state.budget !== undefined) {
+                        await this.localDB.put('settings', { key: 'budget', value: state.budget });
+                    }
+                    if (state.themeId !== undefined) {
+                        await this.localDB.put('settings', { key: 'themeId', value: state.themeId });
+                    }
+                    if (state.currency !== undefined) {
+                        await this.localDB.put('settings', { key: 'currency', value: state.currency });
+                    }
+                    if (state.customTheme !== undefined) {
+                        await this.localDB.put('settings', { key: 'customTheme', value: state.customTheme });
+                    }
+                    // 更新设置更新时间戳
+                    await this.localDB.put('settings', { key: 'settings_updated_at', value: now });
+                    
+                    // 然后从数据库读取（确保使用最新保存的值）
                     const budgetSetting = await this.localDB.get('settings', 'budget');
                     const themeSetting = await this.localDB.get('settings', 'themeId');
                     const customThemeSetting = await this.localDB.get('settings', 'customTheme');
                     const currencySetting = await this.localDB.get('settings', 'currency');
-                    const settingsUpdatedAt = await this.localDB.get('settings', 'settings_updated_at');
 
-                    const now = new Date().toISOString();
                     const settingsData = {
                         user_id: currentUser.id,
-                        budget: roundToDecimal(budgetSetting ? budgetSetting.value : 30000, 2), // 确保预算四舍五入到2位小数
-                        theme_id: themeSetting ? themeSetting.value : 'minimal',
-                        custom_theme: customThemeSetting ? customThemeSetting.value : null,
-                        currency: currencySetting ? currencySetting.value : 'TWD',
-                        updated_at: settingsUpdatedAt ? settingsUpdatedAt.value : now,
+                        budget: roundToDecimal(budgetSetting ? budgetSetting.value : (state.budget || 30000), 2), // 确保预算四舍五入到2位小数
+                        theme_id: themeSetting ? themeSetting.value : (state.themeId || 'minimal'),
+                        custom_theme: customThemeSetting ? customThemeSetting.value : (state.customTheme || null),
+                        currency: currencySetting ? currencySetting.value : (state.currency || 'TWD'),
+                        updated_at: now,
                         last_sync_at: now
                     };
+                    
+                    console.log('📤 Syncing settings:', {
+                        budget: settingsData.budget,
+                        theme_id: settingsData.theme_id,
+                        currency: settingsData.currency,
+                        has_custom_theme: !!settingsData.custom_theme
+                    });
 
                     const { error: settingsError } = await this.supabaseClient
                         .from('user_settings')
@@ -2544,13 +2567,10 @@
                             if (settings.custom_theme) {
                                 await this.localDB.put('settings', { key: 'customTheme', value: settings.custom_theme });
                                 state.customTheme = settings.custom_theme;
-                                // 应用自定义主题
-                                if (state.customTheme) {
-                                    document.documentElement.style.setProperty('--accent', state.customTheme.color);
-                                    document.documentElement.style.setProperty('--accent-rgb', state.customTheme.rgb);
-                                    document.documentElement.style.setProperty('--bg-deep', state.customTheme.bg);
-                                    document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${state.customTheme.opacity})`);
-                                }
+                            } else {
+                                // 如果云端没有自定义主题，清除本地自定义主题
+                                await this.localDB.put('settings', { key: 'customTheme', value: null });
+                                state.customTheme = null;
                             }
                             
                             await this.localDB.put('settings', { key: 'settings_updated_at', value: cloudUpdatedAt });
@@ -2560,11 +2580,27 @@
                             state.themeId = settings.theme_id;
                             state.currency = settings.currency;
                             
-                            console.log('✅ Pulled user settings from cloud (updated)');
+                            // 同时更新 localStorage 作为备份
+                            localStorage.setItem('ledger_budget_v13', state.budget);
+                            localStorage.setItem('ledger_theme_id_v13', state.themeId);
+                            localStorage.setItem('ledger_currency_v13', state.currency);
+                            localStorage.setItem('ledger_settings_updated_at_v13', cloudUpdatedAt);
+                            
+                            console.log('✅ Pulled user settings from cloud (updated):', {
+                                budget: state.budget,
+                                theme_id: state.themeId,
+                                currency: state.currency
+                            });
                         } else {
                             console.log('✅ Local settings are newer, keeping local version');
                         }
+                    } else {
+                        // 如果云端没有设置，确保从本地加载
+                        console.log('ℹ️ No settings in cloud, using local settings');
                     }
+                    
+                    // 无论是否更新，都确保应用当前设置到 UI（在 loadDataFromLocal 之后会再次应用，但这里先确保）
+                    // 注意：这里不调用 applyTheme，因为 loadDataFromLocal 会处理
 
                     // 处理每月固定消费数据
                     if (recurringTransactions && recurringTransactions.length > 0) {
@@ -2721,19 +2757,24 @@
                 const currencySetting = await localDB.get('settings', 'currency');
                 const customThemeSetting = await localDB.get('settings', 'customTheme');
 
-                if (budgetSetting) state.budget = budgetSetting.value;
+                if (budgetSetting) state.budget = parseFloat(budgetSetting.value);
                 if (themeSetting) state.themeId = themeSetting.value;
                 if (currencySetting) state.currency = currencySetting.value;
                 if (customThemeSetting) state.customTheme = customThemeSetting.value;
                 
-                // 應用主題
+                // 應用主題和幣值
+                updateCurrencySymbols();
                 if (state.customTheme) {
                     document.documentElement.style.setProperty('--accent', state.customTheme.color);
                     document.documentElement.style.setProperty('--accent-rgb', state.customTheme.rgb);
                     document.documentElement.style.setProperty('--bg-deep', state.customTheme.bg);
                     document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${state.customTheme.opacity})`);
-                } else {
-                    applyTheme(state.themeId);
+                } else if (state.themeId) {
+                    const scheme = THEME_SCHEMES.find(s => s.id === state.themeId) || THEME_SCHEMES[0];
+                    document.documentElement.style.setProperty('--accent', scheme.color);
+                    document.documentElement.style.setProperty('--accent-rgb', scheme.rgb);
+                    document.documentElement.style.setProperty('--bg-deep', scheme.bg);
+                    document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${scheme.opacity})`);
                 }
 
                 // 加载同步元数据
@@ -2934,14 +2975,17 @@
         async function save() {
             try {
                 const now = new Date().toISOString();
-                // 保存到 IndexedDB
+                // 保存到 IndexedDB（确保保存的是 state 中的最新值）
                 await localDB.put('settings', { key: 'budget', value: state.budget });
                 await localDB.put('settings', { key: 'themeId', value: state.themeId });
                 await localDB.put('settings', { key: 'currency', value: state.currency });
                 if (state.customTheme) {
                     await localDB.put('settings', { key: 'customTheme', value: state.customTheme });
+                } else {
+                    // 如果没有自定义主题，清除本地存储的自定义主题
+                    await localDB.put('settings', { key: 'customTheme', value: null });
                 }
-                // 保存设置更新时间戳
+                // 保存设置更新时间戳（每次保存都更新，确保同步时使用最新值）
                 await localDB.put('settings', { key: 'settings_updated_at', value: now });
                 
                 // 保存分类到 IndexedDB
@@ -3165,20 +3209,35 @@
                     }
                     
                     // 同步设置（注意：syncToCloud() 已经处理了这些，这里是为了确保一致性）
+                    // 先确保 state 中的值已保存到数据库
+                    const now = new Date().toISOString();
+                    if (state.budget !== undefined) {
+                        await localDB.put('settings', { key: 'budget', value: state.budget });
+                    }
+                    if (state.themeId !== undefined) {
+                        await localDB.put('settings', { key: 'themeId', value: state.themeId });
+                    }
+                    if (state.currency !== undefined) {
+                        await localDB.put('settings', { key: 'currency', value: state.currency });
+                    }
+                    if (state.customTheme !== undefined) {
+                        await localDB.put('settings', { key: 'customTheme', value: state.customTheme });
+                    }
+                    await localDB.put('settings', { key: 'settings_updated_at', value: now });
+                    
+                    // 然后从数据库读取
                     const budgetSetting = await localDB.get('settings', 'budget');
                     const themeSetting = await localDB.get('settings', 'themeId');
                     const customThemeSetting = await localDB.get('settings', 'customTheme');
                     const currencySetting = await localDB.get('settings', 'currency');
-                    const settingsUpdatedAt = await localDB.get('settings', 'settings_updated_at');
 
-                    const now = new Date().toISOString();
                     const settingsData = {
                         user_id: currentUser.id,
-                        budget: roundToDecimal(budgetSetting ? budgetSetting.value : 30000, 2), // 确保预算四舍五入到2位小数
-                        theme_id: themeSetting ? themeSetting.value : 'minimal',
-                        custom_theme: customThemeSetting ? customThemeSetting.value : null,
-                        currency: currencySetting ? currencySetting.value : 'TWD',
-                        updated_at: settingsUpdatedAt ? settingsUpdatedAt.value : now,
+                        budget: roundToDecimal(budgetSetting ? budgetSetting.value : (state.budget || 30000), 2), // 确保预算四舍五入到2位小数
+                        theme_id: themeSetting ? themeSetting.value : (state.themeId || 'minimal'),
+                        custom_theme: customThemeSetting ? customThemeSetting.value : (state.customTheme || null),
+                        currency: currencySetting ? currencySetting.value : (state.currency || 'TWD'),
+                        updated_at: now,
                         last_sync_at: now
                     };
 
@@ -3195,6 +3254,23 @@
                     // 重新加载合并后的数据（过滤掉已删除的）
                     await loadDataFromLocal();
                     console.log('✅ Reloaded merged data from local storage');
+                    
+                    // 确保设置已应用到 UI
+                    updateCurrencySymbols();
+                    if (state.themeId) {
+                        const scheme = THEME_SCHEMES.find(s => s.id === state.themeId) || THEME_SCHEMES[0];
+                        if (state.customTheme) {
+                            document.documentElement.style.setProperty('--accent', state.customTheme.color);
+                            document.documentElement.style.setProperty('--accent-rgb', state.customTheme.rgb);
+                            document.documentElement.style.setProperty('--bg-deep', state.customTheme.bg);
+                            document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${state.customTheme.opacity})`);
+                        } else {
+                            document.documentElement.style.setProperty('--accent', scheme.color);
+                            document.documentElement.style.setProperty('--accent-rgb', scheme.rgb);
+                            document.documentElement.style.setProperty('--bg-deep', scheme.bg);
+                            document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${scheme.opacity})`);
+                        }
+                    }
                     
                     // 刷新UI
                     renderAll();
@@ -3634,6 +3710,17 @@
                                     await syncManager.syncFromCloud();
                                     // 重新加载合并后的数据
                                     await loadDataFromLocal();
+                                    // 确保设置已应用到 UI
+                                    updateCurrencySymbols();
+                                    if (state.themeId) {
+                                        const scheme = THEME_SCHEMES.find(s => s.id === state.themeId) || THEME_SCHEMES[0];
+                                        if (!state.customTheme) {
+                                            document.documentElement.style.setProperty('--accent', scheme.color);
+                                            document.documentElement.style.setProperty('--accent-rgb', scheme.rgb);
+                                            document.documentElement.style.setProperty('--bg-deep', scheme.bg);
+                                            document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${scheme.opacity})`);
+                                        }
+                                    }
                                 }
                                 
                                 console.log(`✅ Data synchronized. Showing ${state.transactions.length} transactions.`);
@@ -3744,6 +3831,17 @@
                                         await syncManager.syncFromCloud();
                                         // 重新加载合并后的数据
                                         await loadDataFromLocal();
+                                        // 确保设置已应用到 UI
+                                        updateCurrencySymbols();
+                                        if (state.themeId) {
+                                            const scheme = THEME_SCHEMES.find(s => s.id === state.themeId) || THEME_SCHEMES[0];
+                                            if (!state.customTheme) {
+                                                document.documentElement.style.setProperty('--accent', scheme.color);
+                                                document.documentElement.style.setProperty('--accent-rgb', scheme.rgb);
+                                                document.documentElement.style.setProperty('--bg-deep', scheme.bg);
+                                                document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${scheme.opacity})`);
+                                            }
+                                        }
                                     }
                                     
                                     console.log(`✅ Data synchronized. Showing ${state.transactions.length} transactions.`);
@@ -3844,6 +3942,17 @@
                                 await syncManager.syncFromCloud();
                                 // 重新加载合并后的数据
                                 await loadDataFromLocal();
+                                // 确保设置已应用到 UI
+                                updateCurrencySymbols();
+                                if (state.themeId) {
+                                    const scheme = THEME_SCHEMES.find(s => s.id === state.themeId) || THEME_SCHEMES[0];
+                                    if (!state.customTheme) {
+                                        document.documentElement.style.setProperty('--accent', scheme.color);
+                                        document.documentElement.style.setProperty('--accent-rgb', scheme.rgb);
+                                        document.documentElement.style.setProperty('--bg-deep', scheme.bg);
+                                        document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${scheme.opacity})`);
+                                    }
+                                }
                                 renderAll();
                             }
                             
@@ -6774,6 +6883,17 @@
                         console.log('🔄 Pulling data from cloud after code login to ensure consistency...');
                         await syncManager.syncFromCloud();
                         await loadDataFromLocal();
+                        // 确保设置已应用到 UI
+                        updateCurrencySymbols();
+                        if (state.themeId) {
+                            const scheme = THEME_SCHEMES.find(s => s.id === state.themeId) || THEME_SCHEMES[0];
+                            if (!state.customTheme) {
+                                document.documentElement.style.setProperty('--accent', scheme.color);
+                                document.documentElement.style.setProperty('--accent-rgb', scheme.rgb);
+                                document.documentElement.style.setProperty('--bg-deep', scheme.bg);
+                                document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${scheme.opacity})`);
+                            }
+                        }
                         console.log('✅ Data pulled from cloud. All devices will show the same data.');
                     } catch (error) {
                         console.warn('⚠️ Failed to pull data from cloud:', error);
