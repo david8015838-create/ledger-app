@@ -2968,10 +2968,20 @@
             
             try {
                 console.log('🔄 Starting bidirectional merge sync...');
+                console.log('📊 Sync status check:', {
+                    hasSyncManager: !!syncManager,
+                    hasSupabaseClient: !!supabaseClient,
+                    hasCurrentUser: !!currentUser,
+                    isLoggedIn: state.isLoggedIn,
+                    userId: currentUser?.id,
+                    isSyncing: syncManager?.isSyncing
+                });
                 
                 // syncToCloud() 會處理所有同步邏輯，包括雙向合併
                 // 如果同步失敗，本地數據不會被修改，所以不需要撤銷
                 const result = await syncManager.syncToCloud();
+                
+                console.log('📊 Sync result:', result);
 
                 if (result.success) {
                     console.log('✅ Bidirectional merge sync completed');
@@ -3045,7 +3055,12 @@
                     // 显示成功提示
                     alert('✅ 同步完成！所有更改已透過雙向合併儲存到雲端。');
                 } else {
-                    console.warn('⚠️ Manual sync failed:', result.error);
+                    console.error('❌ Manual sync failed:', result);
+                    console.error('❌ Error details:', {
+                        error: result.error,
+                        errorType: typeof result.error,
+                        errorString: String(result.error)
+                    });
                     
                     // 同步失敗時，本地數據不會被修改（syncToCloud 在更新雲端失敗時不會修改本地）
                     // 所以不需要撤銷本地更改，只需要提示用戶
@@ -3054,18 +3069,32 @@
                     
                     // 提供更詳細的錯誤信息
                     let errorMessage = '同步失敗';
+                    let errorDetails = '';
+                    
                     if (result.error === 'offline') {
-                        errorMessage = '無法連接到雲端，請檢查網絡連接';
+                        errorMessage = '無法連接到雲端';
+                        errorDetails = '請檢查：\n1. 網絡連接是否正常\n2. 是否已登入帳戶\n3. Supabase 服務是否可用';
+                    } else if (result.error === 'already_syncing') {
+                        errorMessage = '同步正在進行中';
+                        errorDetails = '請等待當前同步完成後再試';
                     } else if (result.error && result.error.includes('timeout')) {
-                        errorMessage = '同步超時，請檢查網絡連接後重試';
+                        errorMessage = '同步超時';
+                        errorDetails = '請檢查網絡連接後重試';
                     } else if (result.error) {
-                        errorMessage = `同步失敗：${result.error}`;
+                        errorMessage = '同步失敗';
+                        errorDetails = `錯誤信息：${result.error}\n\n請檢查：\n1. 網絡連接\n2. 是否已登入\n3. 瀏覽器控制台是否有更多錯誤信息`;
+                    } else {
+                        errorMessage = '同步失敗（未知錯誤）';
+                        errorDetails = '請打開瀏覽器控制台（F12）查看詳細錯誤信息';
                     }
                     
-                    alert(`⚠️ ${errorMessage}\n\n您的本地數據已保留，可以稍後再試。`);
+                    alert(`⚠️ ${errorMessage}\n\n${errorDetails}\n\n您的本地數據已保留，可以稍後再試。`);
                 }
             } catch (error) {
                 console.error('❌ Manual sync error:', error);
+                console.error('❌ Error stack:', error.stack);
+                console.error('❌ Error name:', error.name);
+                console.error('❌ Error message:', error.message);
                 
                 // 同步過程中出現異常，本地數據可能已經被部分修改
                 // 但由於 syncToCloud 的設計，如果更新雲端失敗，本地不會被修改
@@ -3075,11 +3104,16 @@
                 
                 // 提供更詳細的錯誤信息
                 let errorMessage = '同步過程中發生錯誤';
+                let errorDetails = '';
+                
                 if (error.message) {
                     errorMessage = `同步錯誤：${error.message}`;
+                    errorDetails = `錯誤類型：${error.name || 'Unknown'}\n\n請檢查：\n1. 瀏覽器控制台（F12）的詳細錯誤\n2. 網絡連接是否正常\n3. 是否已登入帳戶`;
+                } else {
+                    errorDetails = '請打開瀏覽器控制台（F12）查看詳細錯誤信息';
                 }
                 
-                alert(`❌ ${errorMessage}\n\n您的本地數據已保留，可以稍後再試。`);
+                alert(`❌ ${errorMessage}\n\n${errorDetails}\n\n您的本地數據已保留，可以稍後再試。`);
             } finally {
                 clearTimeout(manualSyncTimeout);
                 // 确保同步状态被重置
