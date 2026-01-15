@@ -2477,8 +2477,12 @@
                         console.warn('⚠️ Failed to fetch recurring transactions:', recurringError);
                     }
 
-                    // 4. 执行双向合并：获取本地数据并合并
-                    const localTransactions = await this.localDB.getAll('transactions');
+                    // 4. 完全替换本地数据为云端数据（不合并，确保B手机和A手机数据完全一致）
+                    console.log('🔄 Replacing local data with cloud data (full sync)...');
+                    
+                    // 先清除本地所有交易记录
+                    await this.localDB.clear('transactions');
+                    console.log('🗑️ Cleared local transactions');
                     
                     // 确保所有记录都有 is_deleted 字段，并确保 ID 是整数
                     const normalizedCloud = (cloudTransactions || []).map(tx => ({
@@ -2488,19 +2492,9 @@
                         updated_at: tx.updated_at || new Date().toISOString()
                     }));
                     
-                    const normalizedLocal = localTransactions.map(tx => ({
-                        ...tx,
-                        id: Math.floor(parseFloat(tx.id)), // 确保 ID 是整数（BIGINT）
-                        is_deleted: tx.is_deleted || false,
-                        updated_at: tx.updated_at || new Date().toISOString()
-                    }));
-                    
-                    // 执行双向合并
-                    const mergedTransactions = this.mergeTransactions(normalizedCloud, normalizedLocal);
-                    
-                    // 保存合并后的数据到本地（包括已删除的记录和信用卡字段）
+                    // 直接用云端数据替换本地数据（包括已删除的记录和信用卡字段）
                     let savedCount = 0;
-                    for (const tx of mergedTransactions) {
+                    for (const tx of normalizedCloud) {
                         await this.localDB.put('transactions', {
                             id: Math.floor(parseFloat(tx.id)), // 确保 ID 是整数（BIGINT）
                             amount: roundToDecimal(parseFloat(tx.amount), 2), // 确保金额四舍五入到2位小数
@@ -2520,7 +2514,7 @@
                         savedCount++;
                     }
                     
-                    console.log(`✅ Merged ${mergedTransactions.length} transactions (${savedCount} saved to local)`);
+                    console.log(`✅ Replaced local data with ${normalizedCloud.length} cloud transactions (${savedCount} saved to local)`);
 
                     if (categories && categories.length > 0) {
                         for (const cat of categories) {
@@ -2535,7 +2529,7 @@
                         console.log(`✅ Pulled ${categories.length} categories from cloud`);
                     }
 
-                    // 处理信用卡数据
+                    // 处理信用卡数据（完全替换）
                     if (creditCards && creditCards.length > 0) {
                         state.cards = creditCards.map(card => ({
                             id: card.id,
@@ -2548,61 +2542,61 @@
                         }));
                         // 保存到 localStorage
                         localStorage.setItem('ledger_cards_v13', JSON.stringify(state.cards));
-                        console.log(`✅ Pulled ${creditCards.length} credit cards from cloud`);
+                        console.log(`✅ Replaced local credit cards with ${creditCards.length} cloud credit cards`);
+                    } else {
+                        // 如果云端没有信用卡，清除本地信用卡
+                        state.cards = [];
+                        localStorage.setItem('ledger_cards_v13', JSON.stringify([]));
+                        console.log('ℹ️ No credit cards in cloud, cleared local credit cards');
                     }
 
+                    // 处理用户设置（完全替换，不检查更新时间）
                     if (settings) {
-                        // 检查本地设置的更新时间，只更新较新的版本
-                        const localSettingsUpdatedAt = await this.localDB.get('settings', 'settings_updated_at');
                         const cloudUpdatedAt = settings.updated_at || settings.last_sync_at;
                         
-                        // 如果云端数据更新，或者本地没有更新时间戳，则更新本地设置
-                        if (!localSettingsUpdatedAt || !cloudUpdatedAt || 
-                            new Date(cloudUpdatedAt) > new Date(localSettingsUpdatedAt.value)) {
-                            await this.localDB.put('settings', { key: 'budget', value: roundToDecimal(parseFloat(settings.budget), 2) }); // 确保预算四舍五入到2位小数
-                            await this.localDB.put('settings', { key: 'themeId', value: settings.theme_id });
-                            await this.localDB.put('settings', { key: 'currency', value: settings.currency });
-                            
-                            // 同步自定义主题
-                            if (settings.custom_theme) {
-                                await this.localDB.put('settings', { key: 'customTheme', value: settings.custom_theme });
-                                state.customTheme = settings.custom_theme;
-                            } else {
-                                // 如果云端没有自定义主题，清除本地自定义主题
-                                await this.localDB.put('settings', { key: 'customTheme', value: null });
-                                state.customTheme = null;
-                            }
-                            
-                            await this.localDB.put('settings', { key: 'settings_updated_at', value: cloudUpdatedAt });
-                            
-                            // 更新 state
-                            state.budget = roundToDecimal(parseFloat(settings.budget), 2); // 确保预算四舍五入到2位小数
-                            state.themeId = settings.theme_id;
-                            state.currency = settings.currency;
-                            
-                            // 同时更新 localStorage 作为备份
-                            localStorage.setItem('ledger_budget_v13', state.budget);
-                            localStorage.setItem('ledger_theme_id_v13', state.themeId);
-                            localStorage.setItem('ledger_currency_v13', state.currency);
-                            localStorage.setItem('ledger_settings_updated_at_v13', cloudUpdatedAt);
-                            
-                            console.log('✅ Pulled user settings from cloud (updated):', {
-                                budget: state.budget,
-                                theme_id: state.themeId,
-                                currency: state.currency
-                            });
+                        // 完全替换本地设置为云端设置
+                        await this.localDB.put('settings', { key: 'budget', value: roundToDecimal(parseFloat(settings.budget), 2) }); // 确保预算四舍五入到2位小数
+                        await this.localDB.put('settings', { key: 'themeId', value: settings.theme_id });
+                        await this.localDB.put('settings', { key: 'currency', value: settings.currency });
+                        
+                        // 同步自定义主题
+                        if (settings.custom_theme) {
+                            await this.localDB.put('settings', { key: 'customTheme', value: settings.custom_theme });
+                            state.customTheme = settings.custom_theme;
                         } else {
-                            console.log('✅ Local settings are newer, keeping local version');
+                            // 如果云端没有自定义主题，清除本地自定义主题
+                            await this.localDB.put('settings', { key: 'customTheme', value: null });
+                            state.customTheme = null;
                         }
+                        
+                        await this.localDB.put('settings', { key: 'settings_updated_at', value: cloudUpdatedAt });
+                        
+                        // 更新 state
+                        state.budget = roundToDecimal(parseFloat(settings.budget), 2); // 确保预算四舍五入到2位小数
+                        state.themeId = settings.theme_id;
+                        state.currency = settings.currency;
+                        
+                        // 同时更新 localStorage 作为备份
+                        localStorage.setItem('ledger_budget_v13', state.budget);
+                        localStorage.setItem('ledger_theme_id_v13', state.themeId);
+                        localStorage.setItem('ledger_currency_v13', state.currency);
+                        localStorage.setItem('ledger_settings_updated_at_v13', cloudUpdatedAt);
+                        
+                        console.log('✅ Replaced local settings with cloud settings:', {
+                            budget: state.budget,
+                            theme_id: state.themeId,
+                            currency: state.currency
+                        });
                     } else {
-                        // 如果云端没有设置，确保从本地加载
-                        console.log('ℹ️ No settings in cloud, using local settings');
+                        // 如果云端没有设置，使用默认值
+                        console.log('ℹ️ No settings in cloud, using default settings');
+                        state.budget = 30000;
+                        state.themeId = 'minimal';
+                        state.currency = 'TWD';
+                        state.customTheme = null;
                     }
                     
-                    // 无论是否更新，都确保应用当前设置到 UI（在 loadDataFromLocal 之后会再次应用，但这里先确保）
-                    // 注意：这里不调用 applyTheme，因为 loadDataFromLocal 会处理
-
-                    // 处理每月固定消费数据
+                    // 处理每月固定消费数据（完全替换）
                     if (recurringTransactions && recurringTransactions.length > 0) {
                         state.recurringTransactions = recurringTransactions.map(recurring => ({
                             id: recurring.id,
@@ -2619,7 +2613,12 @@
                         }));
                         // 保存到 localStorage
                         localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
-                        console.log(`✅ Pulled ${recurringTransactions.length} recurring transactions from cloud`);
+                        console.log(`✅ Replaced local recurring transactions with ${recurringTransactions.length} cloud recurring transactions`);
+                    } else {
+                        // 如果云端没有每月固定消费，清除本地数据
+                        state.recurringTransactions = [];
+                        localStorage.setItem('ledger_recurring_v1', JSON.stringify([]));
+                        console.log('ℹ️ No recurring transactions in cloud, cleared local recurring transactions');
                     }
 
                     return { success: true };
