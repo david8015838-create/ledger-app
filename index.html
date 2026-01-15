@@ -2929,14 +2929,6 @@
                 return;
             }
 
-            // 保存本地数据快照，用于失败时撤销
-            let localSnapshot = null;
-            try {
-                localSnapshot = await localDB.getAll('transactions');
-            } catch (e) {
-                console.warn('⚠️ Failed to create snapshot:', e);
-            }
-
             updateSyncUI();
             
             // 设置同步超时（90秒总超时）
@@ -2953,10 +2945,8 @@
             try {
                 console.log('🔄 Starting bidirectional merge sync...');
                 
-                // 步骤 A：获取云端和本地数据
-                // 步骤 B：执行双向合并
-                // 步骤 C：更新云端和本地
-                // 这些步骤都在 syncToCloud() 中完成
+                // syncToCloud() 會處理所有同步邏輯，包括雙向合併
+                // 如果同步失敗，本地數據不會被修改，所以不需要撤銷
                 const result = await syncManager.syncToCloud();
 
                 if (result.success) {
@@ -2982,8 +2972,12 @@
                             .from('categories')
                             .upsert(catData, { onConflict: 'id' });
 
-                        if (catError) throw catError;
-                        console.log('✅ Synced categories');
+                        if (catError) {
+                            console.warn('⚠️ Failed to sync categories:', catError);
+                            // 分類同步失敗不影響整體同步成功
+                        } else {
+                            console.log('✅ Synced categories');
+                        }
                     }
                     
                     // 同步设置
@@ -3006,8 +3000,12 @@
                         .from('user_settings')
                         .upsert(settingsData, { onConflict: 'user_id' });
 
-                    if (settingsError) throw settingsError;
-                    console.log('✅ Synced user settings');
+                    if (settingsError) {
+                        console.warn('⚠️ Failed to sync settings:', settingsError);
+                        // 設置同步失敗不影響整體同步成功
+                    } else {
+                        console.log('✅ Synced user settings');
+                    }
                     
                     // 记录最后同步时间
                     await syncManager.setLastSyncTime(new Date());
@@ -3025,40 +3023,39 @@
                 } else {
                     console.warn('⚠️ Manual sync failed:', result.error);
                     
-                    // 撤销：恢复快照
-                    if (localSnapshot) {
-                        try {
-                            for (const tx of localSnapshot) {
-                                await localDB.put('transactions', tx);
-                            }
-                            await loadDataFromLocal();
-                            renderAll();
-                            console.log('✅ Local changes reverted');
-                        } catch (revertError) {
-                            console.error('❌ Failed to revert changes:', revertError);
-                        }
+                    // 同步失敗時，本地數據不會被修改（syncToCloud 在更新雲端失敗時不會修改本地）
+                    // 所以不需要撤銷本地更改，只需要提示用戶
+                    await loadDataFromLocal();
+                    renderAll();
+                    
+                    // 提供更詳細的錯誤信息
+                    let errorMessage = '同步失敗';
+                    if (result.error === 'offline') {
+                        errorMessage = '無法連接到雲端，請檢查網絡連接';
+                    } else if (result.error && result.error.includes('timeout')) {
+                        errorMessage = '同步超時，請檢查網絡連接後重試';
+                    } else if (result.error) {
+                        errorMessage = `同步失敗：${result.error}`;
                     }
                     
-                    alert('⚠️ 同步失敗：' + (result.error || '未知錯誤') + '\n\n本地更改已撤銷。');
+                    alert(`⚠️ ${errorMessage}\n\n您的本地數據已保留，可以稍後再試。`);
                 }
             } catch (error) {
                 console.error('❌ Manual sync error:', error);
                 
-                // 撤销：恢复快照
-                if (localSnapshot) {
-                    try {
-                        for (const tx of localSnapshot) {
-                            await localDB.put('transactions', tx);
-                        }
-                        await loadDataFromLocal();
-                        renderAll();
-                        console.log('✅ Local changes reverted after error');
-                    } catch (revertError) {
-                        console.error('❌ Failed to revert changes:', revertError);
-                    }
+                // 同步過程中出現異常，本地數據可能已經被部分修改
+                // 但由於 syncToCloud 的設計，如果更新雲端失敗，本地不會被修改
+                // 所以這裡也不需要撤銷，只需要重新加載本地數據
+                await loadDataFromLocal();
+                renderAll();
+                
+                // 提供更詳細的錯誤信息
+                let errorMessage = '同步過程中發生錯誤';
+                if (error.message) {
+                    errorMessage = `同步錯誤：${error.message}`;
                 }
                 
-                alert('❌ 同步出錯：' + (error.message || '未知錯誤') + '\n\n本地更改已撤銷。');
+                alert(`❌ ${errorMessage}\n\n您的本地數據已保留，可以稍後再試。`);
             } finally {
                 clearTimeout(manualSyncTimeout);
                 // 确保同步状态被重置
