@@ -2903,8 +2903,29 @@
 
         // 手动同步按钮（双向增量合并）
         async function manualSync() {
-            if (!syncManager || syncManager.isSyncing) {
-                console.warn('⚠️ Sync already in progress or syncManager not available');
+            // 檢查 Supabase 客戶端
+            if (!supabaseClient) {
+                alert('⚠️ Supabase 未配置，無法使用雲端同步功能');
+                return;
+            }
+
+            // 檢查登入狀態
+            if (!currentUser || !state.isLoggedIn) {
+                alert('請先登入帳戶才能使用雲端同步功能');
+                showAuthPage();
+                return;
+            }
+
+            // 確保 syncManager 已初始化
+            if (!syncManager) {
+                console.log('🔄 Initializing syncManager...');
+                syncManager = new SyncManager(localDB, supabaseClient);
+                syncManager.lastSyncTime = await syncManager.getLastSyncTime();
+            }
+
+            if (syncManager.isSyncing) {
+                console.warn('⚠️ Sync already in progress');
+                alert('⚠️ 同步正在進行中，請稍候...');
                 return;
             }
 
@@ -2941,7 +2962,11 @@
                 if (result.success) {
                     console.log('✅ Bidirectional merge sync completed');
                     
-                    // 同步分类和设置
+                    // 同步分类和设置（僅在同步交易成功後執行）
+                    if (!supabaseClient || !currentUser) {
+                        throw new Error('Supabase 客戶端或用戶未初始化');
+                    }
+
                     const categories = await localDB.getAll('categories');
                     if (categories.length > 0) {
                         const catData = categories.map(cat => ({
@@ -2953,7 +2978,7 @@
                             updated_at: cat.updated_at || new Date().toISOString()
                         }));
 
-                        const { error: catError } = await syncManager.supabaseClient
+                        const { error: catError } = await supabaseClient
                             .from('categories')
                             .upsert(catData, { onConflict: 'id' });
 
@@ -2977,7 +3002,7 @@
                         last_sync_at: now
                     };
 
-                    const { error: settingsError } = await syncManager.supabaseClient
+                    const { error: settingsError } = await supabaseClient
                         .from('user_settings')
                         .upsert(settingsData, { onConflict: 'user_id' });
 
@@ -3257,6 +3282,7 @@
                             // 刷新UI（确保数据已显示）
                             renderAll();
                             updateAuthUI();
+                            updateSyncUI();
                             console.log('✅ UI refreshed after login');
                             
                             // 重置 Magic Link 处理标记
@@ -3367,6 +3393,7 @@
                                 showMainApp();
                                 renderAll();
                                 updateAuthUI();
+                                updateSyncUI();
                             }
                         }
                         
@@ -6340,23 +6367,28 @@
                 // 清空輸入
                 document.getElementById('loginCode').value = '';
                 
+                // 確保同步管理器已初始化
+                if (!syncManager) {
+                    syncManager = new SyncManager(localDB, supabaseClient);
+                    syncManager.lastSyncTime = await syncManager.getLastSyncTime();
+                }
+
                 // 跳轉到主頁面（从云端拉取数据，确保所有设备数据一致）
                 setTimeout(async () => {
-                    if (syncManager) {
-                        // 从云端拉取数据（确保所有设备数据一致，但不自动上传）
-                        try {
-                            console.log('🔄 Pulling data from cloud after code login to ensure consistency...');
-                            await syncManager.syncFromCloud();
-                            await loadDataFromLocal();
-                            console.log('✅ Data pulled from cloud. All devices will show the same data.');
-                        } catch (error) {
-                            console.warn('⚠️ Failed to pull data from cloud:', error);
-                            await loadDataFromLocal();
-                        }
+                    // 从云端拉取数据（确保所有设备数据一致，但不自动上传）
+                    try {
+                        console.log('🔄 Pulling data from cloud after code login to ensure consistency...');
+                        await syncManager.syncFromCloud();
+                        await loadDataFromLocal();
+                        console.log('✅ Data pulled from cloud. All devices will show the same data.');
+                    } catch (error) {
+                        console.warn('⚠️ Failed to pull data from cloud:', error);
+                        await loadDataFromLocal();
                     }
                     showMainApp();
                     renderAll();
-                    updateAuthStatusInSettings();
+                    updateAuthUI();
+                    updateSyncUI();
                 }, 1500);
 
             } catch (error) {
