@@ -11,24 +11,13 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>Ledger - Personal Finance</title>
     <link rel="manifest" href="./manifest.json">
-    <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon-180x180.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192x192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512x512.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%230a0a0c'/%3E%3Cpath fill='%23ffffff' d='M64 32C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V96c0-35.3-28.7-64-64-64H64zm80 256h64c44.2 0 80 35.8 80 80c0 8.8-7.2 16-16 16H80c-8.8 0-16-7.2-16-16c0-44.2 35.8-80 80-80zm-32-96a64 64 0 1 1 128 0 64 64 0 1 1 -128 0zm256-32H304c-8.8 0-16 7.2-16 16s7.2 16 16 16H368c8.8 0 16-7.2 16-16s-7.2-16-16-16zm0 64H304c-8.8 0-16 7.2-16 16s7.2 16 16 16H368c8.8 0 16-7.2 16-16s-7.2-16-16-16zm0 64H304c-8.8 0-16 7.2-16 16s7.2 16 16 16H368c8.8 0 16-7.2 16-16s-7.2-16-16-16z'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%230a0a0c'/%3E%3Cpath fill='%23ffffff' d='M64 32C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V96c0-35.3-28.7-64-64-64H64zm80 256h64c44.2 0 80 35.8 80 80c0 8.8-7.2 16-16 16H80c-8.8 0-16-7.2-16-16c0-44.2 35.8-80 80-80zm-32-96a64 64 0 1 1 128 0 64 64 0 1 1 -128 0zm256-32H304c-8.8 0-16 7.2-16 16s7.2 16 16 16H368c8.8 0 16-7.2 16-16s-7.2-16-16-16zm0 64H304c-8.8 0-16 7.2-16 16s7.2 16 16 16H368c8.8 0 16-7.2 16-16s-7.2-16-16-16zm0 64H304c-8.8 0-16 7.2-16 16s7.2 16 16 16H368c8.8 0 16-7.2 16-16s-7.2-16-16-16z'/%3E%3C/svg%3E">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        // 確保 Supabase 加載完成
-        window.addEventListener('load', () => {
-            if (typeof supabase === 'undefined' && typeof window.supabase === 'undefined') {
-                console.error('❌ Supabase library failed to load from CDN');
-            } else {
-                console.log('✅ Supabase library loaded:', typeof supabase !== 'undefined' ? 'global supabase' : 'window.supabase');
-            }
-        });
-    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
 
@@ -1771,6 +1760,14 @@
             return amountInUSD / toRate;
         }
 
+        // 辅助函数：确保数值四舍五入到指定小数位（用于数据库同步）
+        function roundToDecimal(value, decimals = 2) {
+            if (value === null || value === undefined || isNaN(value)) return 0;
+            const num = parseFloat(value);
+            if (isNaN(num)) return 0;
+            return Math.round(num * Math.pow(10, decimals)) / Math.pow(10, decimals);
+        }
+
         // 精選 130+ 個實用記帳 Emoji - 涵蓋所有生活場景
         // ============================================
         // Supabase 配置
@@ -1786,30 +1783,10 @@
         
         if (SUPABASE_CONFIG.url !== 'YOUR_SUPABASE_URL' && SUPABASE_CONFIG.anonKey !== 'YOUR_SUPABASE_ANON_KEY') {
             try {
-                // 檢查 Supabase 是否已加載
-                if (typeof supabase === 'undefined' && typeof window.supabase === 'undefined') {
-                    console.error('❌ Supabase library not loaded. Please check the script tag.');
-                    throw new Error('Supabase library not loaded');
-                }
-                
-                // 嘗試不同的加載方式（CDN 可能使用 supabase 或 window.supabase）
-                const supabaseLib = supabase || window.supabase;
-                if (!supabaseLib || !supabaseLib.createClient) {
-                    console.error('❌ Supabase.createClient is not available');
-                    throw new Error('Supabase.createClient is not available');
-                }
-                
-                supabaseClient = supabaseLib.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
-                console.log('✅ Supabase initialized successfully');
-                console.log('📊 Supabase URL:', SUPABASE_CONFIG.url);
+                supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+                console.log('✅ Supabase initialized');
             } catch (error) {
-                console.error('❌ Supabase initialization failed:', error);
-                console.error('❌ Error details:', {
-                    message: error.message,
-                    stack: error.stack,
-                    supabaseAvailable: typeof supabase !== 'undefined',
-                    windowSupabaseAvailable: typeof window.supabase !== 'undefined'
-                });
+                console.warn('⚠️ Supabase initialization failed:', error);
             }
         } else {
             console.warn('⚠️ Supabase not configured. Running in local-only mode.');
@@ -1969,6 +1946,96 @@
                 });
             }
 
+            // 自动修复本地数据库中的无效 ID（不删除数据，只修复 ID）
+            async fixInvalidIds() {
+                try {
+                    console.log('🔧 检查并修复无效的 ID...');
+                    const transactions = await this.localDB.getAll('transactions');
+                    let fixedCount = 0;
+                    const transactionsToFix = [];
+
+                    // 找出所有需要修复的记录
+                    for (const tx of transactions) {
+                        const originalId = tx.id;
+                        const fixedId = Math.floor(parseFloat(originalId));
+                        
+                        // 如果 ID 不是整数，需要修复
+                        if (!Number.isInteger(originalId) || originalId !== fixedId) {
+                            transactionsToFix.push({
+                                original: tx,
+                                fixedId: fixedId
+                            });
+                            fixedCount++;
+                        }
+                    }
+
+                    // 批量修复
+                    if (transactionsToFix.length > 0) {
+                        console.log(`🔧 发现 ${fixedCount} 条记录需要修复 ID`);
+                        
+                        for (const { original, fixedId } of transactionsToFix) {
+                            try {
+                                // 检查新 ID 是否已存在（避免冲突）
+                                const existing = await this.localDB.get('transactions', fixedId);
+                                
+                                if (existing && existing.id === fixedId) {
+                                    // 如果新 ID 已存在，比较 updated_at，保留较新的
+                                    const originalUpdated = new Date(original.updated_at || 0).getTime();
+                                    const existingUpdated = new Date(existing.updated_at || 0).getTime();
+                                    
+                                    if (originalUpdated > existingUpdated) {
+                                        // 原记录更新，替换现有记录
+                                        await this.localDB.put('transactions', {
+                                            ...original,
+                                            id: fixedId
+                                        });
+                                    }
+                                    // 否则保留现有记录，不替换
+                                } else {
+                                    // 新 ID 不存在，直接添加修复后的记录
+                                    await this.localDB.put('transactions', {
+                                        ...original,
+                                        id: fixedId
+                                    });
+                                }
+                                
+                                // 删除旧记录（使用原始 ID，如果与新 ID 不同）
+                                if (original.id !== fixedId) {
+                                    try {
+                                        await this.localDB.delete('transactions', original.id);
+                                    } catch (e) {
+                                        // 删除失败不影响（可能已经不存在或被覆盖）
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn(`⚠️ 修复记录 ${original.id} 失败:`, e);
+                            }
+                        }
+                        
+                        console.log(`✅ 已修复 ${fixedCount} 条记录的 ID`);
+                    } else {
+                        console.log('✅ 所有 ID 都是有效的整数');
+                    }
+
+                    // 同时修复 localStorage（如果使用）
+                    try {
+                        const txData = JSON.parse(localStorage.getItem('ledger_tx_v13') || '[]');
+                        const fixedData = txData.map(tx => ({
+                            ...tx,
+                            id: Math.floor(parseFloat(tx.id))
+                        }));
+                        localStorage.setItem('ledger_tx_v13', JSON.stringify(fixedData));
+                    } catch (e) {
+                        // localStorage 修复失败不影响主流程
+                    }
+
+                    return fixedCount;
+                } catch (error) {
+                    console.warn('⚠️ 修复 ID 时出错:', error);
+                    return 0; // 修复失败不影响同步流程
+                }
+            }
+
             async syncToCloud() {
                 if (!this.supabaseClient || !currentUser) {
                     console.warn('⚠️ Sync skipped: Supabase not configured or user not logged in');
@@ -1998,27 +2065,20 @@
                 try {
                     console.log('🔄 Starting bidirectional merge sync...');
 
+                    // 步骤 0：自动修复无效的 ID（不删除数据，只修复 ID）
+                    await this.fixInvalidIds();
+
                     // 步骤 A：获取云端和本地数据
                     console.log('📥 Step A: Fetching cloud and local data...');
                     
                     // 获取云端数据（包括已删除的）
-                    console.log('📡 Fetching cloud transactions for user:', currentUser.id);
                     const { data: cloudTransactions, error: fetchCloudError } = await this.supabaseClient
                         .from('transactions')
                         .select('*')
                         .eq('user_id', currentUser.id)
                         .gte('date', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
                     
-                    if (fetchCloudError) {
-                        console.error('❌ Fetch cloud error:', fetchCloudError);
-                        console.error('❌ Error code:', fetchCloudError.code);
-                        console.error('❌ Error message:', fetchCloudError.message);
-                        console.error('❌ Error details:', fetchCloudError.details);
-                        console.error('❌ Error hint:', fetchCloudError.hint);
-                        throw fetchCloudError;
-                    }
-                    
-                    console.log(`✅ Fetched ${cloudTransactions?.length || 0} cloud transactions`);
+                    if (fetchCloudError) throw fetchCloudError;
                     
                     // 获取本地数据（包括已删除的）
                     const localTransactions = await this.localDB.getAll('transactions');
@@ -2029,12 +2089,14 @@
                     // 标准化数据，确保所有字段存在
                     const normalizedCloud = (cloudTransactions || []).map(tx => ({
                         ...tx,
+                        id: Math.floor(parseFloat(tx.id)), // 确保 ID 是整数（BIGINT）
                         is_deleted: tx.is_deleted || false,
                         updated_at: tx.updated_at || new Date().toISOString()
                     }));
                     
                     const normalizedLocal = localTransactions.map(tx => ({
                         ...tx,
+                        id: Math.floor(parseFloat(tx.id)), // 确保 ID 是整数（BIGINT）
                         is_deleted: tx.is_deleted || false,
                         updated_at: tx.updated_at || new Date().toISOString()
                     }));
@@ -2045,204 +2107,53 @@
                     // 步骤 C：更新云端和本地
                     console.log('💾 Step C: Writing merged data...');
                     
-                    // 先更新云端：上传完整的合并数据（包括已删除的和信用卡字段）
-                    // 只有在云端更新成功后才更新本地，避免数据不一致
+                    // 更新云端：上传完整的合并数据（包括已删除的和信用卡字段）
                     if (mergedTransactions.length > 0) {
-                        // 構建交易數據，使用最基礎的欄位（確保所有數據庫結構都支持）
-                        const txData = mergedTransactions.map(tx => {
-                            // 基礎欄位（所有數據庫都應該有）
-                            // 確保 ID 是整數（BIGINT），避免小數導致錯誤
-                            const txId = typeof tx.id === 'number' ? Math.floor(tx.id) : parseInt(tx.id, 10);
-                            const data = {
-                                id: txId,
-                                user_id: currentUser.id,
-                                amount: tx.amount,
-                                date: tx.date,
-                                note: tx.note || '',
-                                category: tx.category,
-                                icon: tx.icon,
-                                currency: tx.currency || 'TWD',
-                                updated_at: tx.updated_at,
-                                is_deleted: tx.is_deleted || false
-                            };
-                            
-                            return data;
-                        });
+                        const txData = mergedTransactions.map(tx => ({
+                            id: Math.floor(parseFloat(tx.id)), // 确保 ID 是整数（BIGINT）
+                            user_id: currentUser.id,
+                            amount: roundToDecimal(tx.amount, 2), // 确保金额四舍五入到2位小数
+                            date: tx.date,
+                            note: tx.note || '',
+                            category: tx.category,
+                            icon: tx.icon,
+                            currency: tx.currency || 'TWD',
+                            payment_method: tx.paymentMethod || tx.payment_method || 'cash',
+                            card_id: tx.cardId || tx.card_id || null,
+                            installments: tx.installments || 1,
+                            interest_rate: roundToDecimal(tx.interestRate || tx.interest_rate || 0, 2), // 利率也四舍五入到2位小数
+                            billing_month: tx.billingMonth || tx.billing_month || null,
+                            updated_at: tx.updated_at,
+                            is_deleted: tx.is_deleted || false
+                        }));
 
-                        console.log(`📤 Uploading ${txData.length} transactions to cloud (basic fields only)...`);
-                        
-                        // 智能上傳：先嘗試基礎欄位，如果成功再嘗試添加可選欄位
-                        let txError = null;
-                        let uploadAttempt = 0;
-                        const maxAttempts = 3;
-                        let optionalFields = ['payment_method', 'card_id', 'installments', 'interest_rate', 'billing_month'];
-                        
-                        while (uploadAttempt < maxAttempts) {
-                            try {
-                                const { error } = await this.supabaseClient
-                                    .from('transactions')
-                                    .upsert(txData, { onConflict: 'id' });
-                                
-                                if (!error) {
-                                    // 基礎欄位上傳成功！
-                                    console.log('✅ Basic fields uploaded successfully');
-                                    
-                                    // 如果這是第一次嘗試（只有基礎欄位），嘗試逐步添加可選欄位
-                                    if (uploadAttempt === 0) {
-                                        // 先嘗試添加 payment_method 和 card_id（這些欄位通常存在）
-                                        try {
-                                            const txDataWithPayment = mergedTransactions.map(tx => {
-                                                // 确保 ID 是整数
-                                                const txId = typeof tx.id === 'number' ? Math.floor(tx.id) : parseInt(tx.id, 10);
-                                                const data = {
-                                                    id: txId,
-                                                    user_id: currentUser.id,
-                                                    amount: tx.amount,
-                                                    date: tx.date,
-                                                    note: tx.note || '',
-                                                    category: tx.category,
-                                                    icon: tx.icon,
-                                                    currency: tx.currency || 'TWD',
-                                                    updated_at: tx.updated_at,
-                                                    is_deleted: tx.is_deleted || false
-                                                };
-                                                
-                                                const paymentMethod = tx.paymentMethod || tx.payment_method;
-                                                if (paymentMethod && paymentMethod !== 'cash') {
-                                                    data.payment_method = paymentMethod;
-                                                }
-                                                
-                                                const cardId = tx.cardId || tx.card_id;
-                                                if (cardId) {
-                                                    data.card_id = cardId;
-                                                }
-                                                
-                                                return data;
-                                            });
-                                            
-                                            const { error: paymentError } = await this.supabaseClient
-                                                .from('transactions')
-                                                .upsert(txDataWithPayment, { onConflict: 'id' });
-                                            
-                                            if (!paymentError) {
-                                                console.log('✅ Payment fields added successfully');
-                                                
-                                                // 再嘗試添加其他可選欄位（但不包括 billing_month）
-                                                try {
-                                                    const txDataWithMore = mergedTransactions.map(tx => {
-                                                        // 确保 ID 是整数
-                                                        const txId = typeof tx.id === 'number' ? Math.floor(tx.id) : parseInt(tx.id, 10);
-                                                        const data = {
-                                                            id: txId,
-                                                            user_id: currentUser.id,
-                                                            amount: tx.amount,
-                                                            date: tx.date,
-                                                            note: tx.note || '',
-                                                            category: tx.category,
-                                                            icon: tx.icon,
-                                                            currency: tx.currency || 'TWD',
-                                                            updated_at: tx.updated_at,
-                                                            is_deleted: tx.is_deleted || false
-                                                        };
-                                                        
-                                                        const paymentMethod = tx.paymentMethod || tx.payment_method;
-                                                        if (paymentMethod && paymentMethod !== 'cash') {
-                                                            data.payment_method = paymentMethod;
-                                                        }
-                                                        
-                                                        const cardId = tx.cardId || tx.card_id;
-                                                        if (cardId) {
-                                                            data.card_id = cardId;
-                                                        }
-                                                        
-                                                        const installments = tx.installments;
-                                                        if (installments && installments > 1) {
-                                                            data.installments = installments;
-                                                        }
-                                                        
-                                                        const interestRate = tx.interestRate || tx.interest_rate;
-                                                        if (interestRate && interestRate > 0) {
-                                                            data.interest_rate = interestRate;
-                                                        }
-                                                        
-                                                        // 注意：這裡故意不包含 billing_month
-                                                        // 因為這個欄位可能不存在於某些數據庫中
-                                                        
-                                                        return data;
-                                                    });
-                                                    
-                                                    const { error: moreError } = await this.supabaseClient
-                                                        .from('transactions')
-                                                        .upsert(txDataWithMore, { onConflict: 'id' });
-                                                    
-                                                    if (!moreError) {
-                                                        console.log('✅ Additional optional fields added successfully');
-                                                    } else {
-                                                        console.warn('⚠️ Some optional fields not supported, but sync succeeded');
-                                                    }
-                                                } catch (moreErr) {
-                                                    console.warn('⚠️ Error adding additional fields (non-critical):', moreErr.message);
-                                                }
-                                            } else {
-                                                console.warn('⚠️ Payment fields not supported, but basic sync succeeded');
-                                            }
-                                        } catch (paymentErr) {
-                                            console.warn('⚠️ Error adding payment fields (non-critical):', paymentErr.message);
-                                        }
-                                    }
-                                    // 成功，跳出循環
-                                    break;
-                                }
-                                
-                                // 如果是欄位不存在的錯誤，移除該欄位後重試
-                                if (error.code === 'PGRST204' && error.message) {
-                                    const missingField = error.message.match(/column '(\w+)'/);
-                                    if (missingField && missingField[1]) {
-                                        const fieldName = missingField[1];
-                                        console.warn(`⚠️ Column '${fieldName}' not found, removing from data and retrying...`);
-                                        
-                                        // 從所有交易中移除該欄位
-                                        txData.forEach(tx => {
-                                            delete tx[fieldName];
-                                        });
-                                        
-                                        // 從可選欄位列表中移除
-                                        optionalFields = optionalFields.filter(f => f !== fieldName);
-                                        uploadAttempt++;
-                                        continue;
-                                    }
-                                }
-                                
-                                // 其他錯誤，直接拋出
-                                txError = error;
-                                break;
-                            } catch (err) {
-                                txError = err;
-                                break;
-                            }
-                        }
-                        
+                        const { error: txError } = await this.supabaseClient
+                            .from('transactions')
+                            .upsert(txData, { onConflict: 'id' });
+
                         if (txError) {
-                            console.error('❌ Failed to upload transactions to cloud:', txError);
-                            console.error('❌ Error code:', txError.code);
-                            console.error('❌ Error message:', txError.message);
-                            console.error('❌ Error details:', txError.details);
-                            console.error('❌ Error hint:', txError.hint);
-                            throw txError;
+                            console.error('❌ Transaction sync error:', txError);
+                            console.error('❌ Failed transaction data sample:', txData.slice(0, 3));
+                            // 检查是否有带小数的 ID
+                            const invalidIds = txData.filter(tx => !Number.isInteger(tx.id));
+                            if (invalidIds.length > 0) {
+                                console.error('❌ Found transactions with non-integer IDs:', invalidIds.map(tx => ({ id: tx.id, idType: typeof tx.id })));
+                            }
+                            throw new Error(`交易记录同步失败: ${txError.message || JSON.stringify(txError)}`);
                         }
                         console.log(`✅ Uploaded ${mergedTransactions.length} merged transactions to cloud`);
-                        
-                        // 云端更新成功后才更新本地：保存完整的合并数据（包括已删除的和信用卡字段，用于同步）
-                        // 批量处理，避免循环过慢
+                    }
+                    
+                    // 更新本地：保存完整的合并数据（包括已删除的和信用卡字段，用于同步）
+                    // 批量处理，避免循环过慢
+                    if (mergedTransactions.length > 0) {
                         const batchSize = 100;
                         for (let i = 0; i < mergedTransactions.length; i += batchSize) {
                             const batch = mergedTransactions.slice(i, i + batchSize);
-                            await Promise.all(batch.map(tx => {
-                                // 确保 ID 是整数（BIGINT）
-                                const txId = typeof tx.id === 'number' ? Math.floor(tx.id) : parseInt(tx.id, 10);
-                                return this.localDB.put('transactions', {
-                                    id: txId,
-                                    amount: parseFloat(tx.amount),
+                            await Promise.all(batch.map(tx => 
+                                this.localDB.put('transactions', {
+                                    id: Math.floor(parseFloat(tx.id)), // 确保 ID 是整数（BIGINT）
+                                    amount: roundToDecimal(parseFloat(tx.amount), 2), // 确保金额四舍五入到2位小数
                                     date: tx.date,
                                     note: tx.note || '',
                                     category: tx.category,
@@ -2251,7 +2162,7 @@
                                     paymentMethod: tx.payment_method || tx.paymentMethod || 'cash',
                                     cardId: tx.card_id || tx.cardId || null,
                                     installments: tx.installments || 1,
-                                    interestRate: tx.interest_rate || tx.interestRate || 0,
+                                    interestRate: roundToDecimal(tx.interest_rate || tx.interestRate || 0, 2), // 确保利率四舍五入到2位小数
                                     billingMonth: tx.billing_month || tx.billingMonth || null,
                                     updated_at: tx.updated_at,
                                     is_deleted: tx.is_deleted || false
@@ -2262,143 +2173,139 @@
                         console.log(`✅ Saved ${mergedTransactions.length} merged transactions to local`);
                     }
 
-                    // 2. 同步分类（即使失敗也不影響整體同步成功）
-                    try {
-                        const categories = await this.localDB.getAll('categories');
-                        const localCatIds = new Set();
-                        
-                        if (categories.length > 0) {
-                            const catData = categories.map(cat => {
-                                const catId = cat.id || crypto.randomUUID();
-                                localCatIds.add(catId);
-                                return {
-                                    id: catId,
-                                    user_id: currentUser.id,
-                                    name: cat.name,
-                                    icon: cat.icon,
-                                    color: cat.color,
-                                    updated_at: cat.updated_at || new Date().toISOString()
-                                };
-                            });
-
-                            const { error: catError } = await this.supabaseClient
-                                .from('categories')
-                                .upsert(catData, { onConflict: 'id' });
-
-                            if (catError) {
-                                console.warn('⚠️ Failed to sync categories:', catError);
-                            } else {
-                                console.log(`✅ Synced ${categories.length} categories`);
-                            }
-                            
-                            // 2.1 删除云端中本地不存在的分类（实现真正的删除同步）
-                            const { data: cloudCategories, error: fetchCatError } = await this.supabaseClient
-                                .from('categories')
-                                .select('id')
-                                .eq('user_id', currentUser.id);
-                            
-                            if (!fetchCatError && cloudCategories) {
-                                const cloudCatIds = new Set(cloudCategories.map(cat => cat.id));
-                                const toDelete = Array.from(cloudCatIds).filter(id => !localCatIds.has(id));
-                                
-                                if (toDelete.length > 0) {
-                                    const { error: deleteError } = await this.supabaseClient
-                                        .from('categories')
-                                        .delete()
-                                        .in('id', toDelete);
-                                    
-                                    if (deleteError) {
-                                        console.warn('⚠️ Failed to delete categories from cloud:', deleteError);
-                                    } else {
-                                        console.log(`✅ Deleted ${toDelete.length} categories from cloud`);
-                                    }
-                                }
-                            }
-                        }
-                    } catch (catSyncError) {
-                        console.warn('⚠️ Category sync failed, but continuing:', catSyncError);
-                    }
-
-                    // 3. 同步使用者設定（即使失敗也不影響整體同步成功）
-                    try {
-                        const budgetSetting = await this.localDB.get('settings', 'budget');
-                        const themeSetting = await this.localDB.get('settings', 'themeId');
-                        const currencySetting = await this.localDB.get('settings', 'currency');
-                        const customThemeSetting = await this.localDB.get('settings', 'customTheme');
-                        const settingsUpdatedAt = await this.localDB.get('settings', 'settings_updated_at');
-
-                        console.log(`📊 Settings from IndexedDB:`, {
-                            budget: budgetSetting ? budgetSetting.value : 'not found',
-                            themeId: themeSetting ? themeSetting.value : 'not found',
-                            currency: currencySetting ? currencySetting.value : 'not found',
-                            customTheme: customThemeSetting ? 'exists' : 'not found'
+                    // 2. 同步分类
+                    const categories = await this.localDB.getAll('categories');
+                    const localCatIds = new Set();
+                    
+                    if (categories.length > 0) {
+                        const catData = categories.map(cat => {
+                            const catId = cat.id || crypto.randomUUID();
+                            localCatIds.add(catId);
+                            return {
+                                id: catId,
+                                user_id: currentUser.id,
+                                name: cat.name,
+                                icon: cat.icon,
+                                color: cat.color,
+                                updated_at: cat.updated_at || new Date().toISOString()
+                            };
                         });
 
-                        const now = new Date().toISOString();
-                        const settingsData = {
-                            user_id: currentUser.id,
-                            budget: budgetSetting ? budgetSetting.value : 30000,
-                            theme_id: themeSetting ? themeSetting.value : 'minimal',
-                            currency: currencySetting ? currencySetting.value : 'TWD',
-                            custom_theme: customThemeSetting ? customThemeSetting.value : null,
-                            updated_at: settingsUpdatedAt ? settingsUpdatedAt.value : now,
-                            last_sync_at: now
-                        };
+                        const { error: catError } = await this.supabaseClient
+                            .from('categories')
+                            .upsert(catData, { onConflict: 'id' });
 
-                        console.log(`📤 Uploading settings to cloud:`, settingsData);
-
-                        const { error: settingsError } = await this.supabaseClient
-                            .from('user_settings')
-                            .upsert(settingsData, { onConflict: 'user_id' });
-
-                        if (settingsError) {
-                            console.warn('⚠️ Failed to sync user settings:', settingsError);
-                            console.warn('⚠️ Settings error details:', JSON.stringify(settingsError, null, 2));
-                        } else {
-                            console.log('✅ Synced user settings successfully (including custom theme and budget)');
+                        if (catError) throw catError;
+                        console.log(`✅ Synced ${categories.length} categories`);
+                    }
+                    
+                    // 2.1 删除云端中本地不存在的分类（实现真正的删除同步）
+                    const { data: cloudCategories, error: fetchCatError } = await this.supabaseClient
+                        .from('categories')
+                        .select('id')
+                        .eq('user_id', currentUser.id);
+                    
+                    if (!fetchCatError && cloudCategories) {
+                        const cloudCatIds = new Set(cloudCategories.map(cat => cat.id));
+                        const toDelete = Array.from(cloudCatIds).filter(id => !localCatIds.has(id));
+                        
+                        if (toDelete.length > 0) {
+                            const { error: deleteError } = await this.supabaseClient
+                                .from('categories')
+                                .delete()
+                                .in('id', toDelete);
+                            
+                            if (deleteError) {
+                                console.warn('⚠️ Failed to delete categories from cloud:', deleteError);
+                            } else {
+                                console.log(`✅ Deleted ${toDelete.length} categories from cloud`);
+                            }
                         }
-                    } catch (settingsSyncError) {
-                        console.warn('⚠️ Settings sync failed, but continuing:', settingsSyncError);
-                        console.warn('⚠️ Settings sync error details:', JSON.stringify(settingsSyncError, null, 2));
                     }
 
-                    // 3.5. 同步信用卡数据（即使失敗也不影響整體同步成功）
-                    try {
-                        console.log(`📊 Checking credit cards: state.cards =`, state.cards);
-                        console.log(`📊 Credit cards length: ${state.cards ? state.cards.length : 'null'}`);
-                        
-                        if (state.cards && state.cards.length > 0) {
-                            const now = new Date().toISOString();
-                            const cardData = state.cards.map(card => ({
-                                id: card.id,
-                                user_id: currentUser.id,
-                                name: card.name,
-                                closing_day: card.closingDay,
-                                due_days_after: card.dueDaysAfter,
-                                carrying_balance: card.carryingBalance || 0,
-                                initial_balance: card.initialBalance || 0,
-                                updated_at: card.updated_at || now,
-                                is_deleted: card.is_deleted || false
-                            }));
+                    // 3. 同步使用者設定
+                    const budgetSetting = await this.localDB.get('settings', 'budget');
+                    const themeSetting = await this.localDB.get('settings', 'themeId');
+                    const customThemeSetting = await this.localDB.get('settings', 'customTheme');
+                    const currencySetting = await this.localDB.get('settings', 'currency');
+                    const settingsUpdatedAt = await this.localDB.get('settings', 'settings_updated_at');
 
-                            console.log(`📤 Uploading ${cardData.length} credit cards to cloud:`, cardData);
+                    const now = new Date().toISOString();
+                    const settingsData = {
+                        user_id: currentUser.id,
+                        budget: roundToDecimal(budgetSetting ? budgetSetting.value : 30000, 2), // 确保预算四舍五入到2位小数
+                        theme_id: themeSetting ? themeSetting.value : 'minimal',
+                        custom_theme: customThemeSetting ? customThemeSetting.value : null,
+                        currency: currencySetting ? currencySetting.value : 'TWD',
+                        updated_at: settingsUpdatedAt ? settingsUpdatedAt.value : now,
+                        last_sync_at: now
+                    };
 
-                            const { error: cardError } = await this.supabaseClient
-                                .from('credit_cards')
-                                .upsert(cardData, { onConflict: 'id' });
+                    const { error: settingsError } = await this.supabaseClient
+                        .from('user_settings')
+                        .upsert(settingsData, { onConflict: 'user_id' });
 
-                            if (cardError) {
-                                console.warn('⚠️ Failed to sync credit cards:', cardError);
-                                console.warn('⚠️ Card error details:', JSON.stringify(cardError, null, 2));
-                            } else {
-                                console.log(`✅ Synced ${state.cards.length} credit cards successfully`);
-                            }
-                        } else {
-                            console.log('ℹ️ No credit cards to sync (state.cards is empty or null)');
+                    if (settingsError) {
+                        console.error('❌ Settings sync error:', settingsError);
+                        console.error('❌ Failed settings data:', settingsData);
+                        throw new Error(`用户设置同步失败: ${settingsError.message || JSON.stringify(settingsError)}`);
+                    }
+                    console.log('✅ Synced user settings');
+
+                    // 3.5. 同步信用卡数据
+                    if (state.cards && state.cards.length > 0) {
+                        const cardData = state.cards.map(card => ({
+                            id: card.id,
+                            user_id: currentUser.id,
+                            name: card.name,
+                            closing_day: card.closingDay,
+                            due_days_after: card.dueDaysAfter,
+                            carrying_balance: roundToDecimal(card.carryingBalance || 0, 2), // 确保余额四舍五入到2位小数
+                            initial_balance: roundToDecimal(card.initialBalance || 0, 2), // 确保初始余额四舍五入到2位小数
+                            updated_at: card.updated_at || now,
+                            is_deleted: card.is_deleted || false
+                        }));
+
+                        const { error: cardError } = await this.supabaseClient
+                            .from('credit_cards')
+                            .upsert(cardData, { onConflict: 'id' });
+
+                        if (cardError) {
+                            console.error('❌ Credit card sync error:', cardError);
+                            console.error('❌ Failed card data sample:', cardData.slice(0, 2));
+                            throw new Error(`信用卡同步失败: ${cardError.message || JSON.stringify(cardError)}`);
                         }
-                    } catch (cardSyncError) {
-                        console.warn('⚠️ Credit card sync failed, but continuing:', cardSyncError);
-                        console.warn('⚠️ Card sync error details:', JSON.stringify(cardSyncError, null, 2));
+                        console.log(`✅ Synced ${state.cards.length} credit cards`);
+                    }
+
+                    // 3.6. 同步每月固定消费数据
+                    if (state.recurringTransactions && state.recurringTransactions.length > 0) {
+                        const recurringData = state.recurringTransactions.map(recurring => ({
+                            id: recurring.id,
+                            user_id: currentUser.id,
+                            note: recurring.note || null,
+                            amount: roundToDecimal(recurring.amount, 2), // 确保金额四舍五入到2位小数
+                            category: recurring.category,
+                            frequency: recurring.frequency,
+                            start_date: recurring.startDate,
+                            end_date: recurring.endDate || null,
+                            payment_method: recurring.paymentMethod || 'cash',
+                            card_id: recurring.cardId || null,
+                            last_created: recurring.lastCreated || null,
+                            updated_at: recurring.updated_at || now,
+                            is_deleted: recurring.is_deleted || false
+                        }));
+
+                        const { error: recurringError } = await this.supabaseClient
+                            .from('recurring_transactions')
+                            .upsert(recurringData, { onConflict: 'id' });
+
+                        if (recurringError) {
+                            console.error('❌ Recurring transaction sync error:', recurringError);
+                            console.error('❌ Failed recurring data sample:', recurringData.slice(0, 2));
+                            throw new Error(`每月固定消费同步失败: ${recurringError.message || JSON.stringify(recurringError)}`);
+                        }
+                        console.log(`✅ Synced ${state.recurringTransactions.length} recurring transactions`);
                     }
 
                     // 4. 執行雲端資料清理（刪除 365 天前的資料）
@@ -2424,42 +2331,13 @@
 
                 } catch (error) {
                     console.error('❌ Sync failed:', error);
-                    console.error('❌ Error details:', {
-                        name: error.name,
-                        message: error.message,
-                        code: error.code,
-                        details: error.details,
-                        hint: error.hint,
-                        stack: error.stack
-                    });
                     clearTimeout(syncTimeout);
-                    
-                    // 提取更詳細的錯誤信息
-                    let errorMessage = '未知错误';
-                    if (error.message) {
-                        errorMessage = error.message;
-                    } else if (error.details) {
-                        errorMessage = error.details;
-                    } else if (error.hint) {
-                        errorMessage = error.hint;
-                    }
-                    
-                    // 如果是 Supabase 錯誤，提取更多信息
-                    if (error.code) {
-                        errorMessage = `[${error.code}] ${errorMessage}`;
-                    }
-                    
-                    this.syncError = errorMessage;
+                    this.syncError = error.message || '未知错误';
                     this.isSyncing = false;
                     updateSyncUI();
 
-                    // 返回詳細錯誤信息
-                    return { 
-                        success: false, 
-                        error: errorMessage,
-                        errorCode: error.code,
-                        errorDetails: error.details || error.hint
-                    };
+                    // 靜默處理錯誤，不影響使用者體驗
+                    return { success: false, error: this.syncError };
                 } finally {
                     // 确保状态总是被重置
                     clearTimeout(syncTimeout);
@@ -2475,19 +2353,22 @@
             mergeTransactions(cloudData, localData) {
                 const mergedMap = new Map();
                 
-                // 1. 先添加所有本地数据
+                // 1. 先添加所有本地数据（确保 ID 是整数）
                 localData.forEach(tx => {
-                    mergedMap.set(tx.id, { ...tx });
+                    const intId = Math.floor(parseFloat(tx.id));
+                    mergedMap.set(intId, { ...tx, id: intId });
                 });
                 
-                // 2. 处理云端数据
+                // 2. 处理云端数据（确保 ID 是整数）
                 cloudData.forEach(cloudTx => {
-                    const localTx = mergedMap.get(cloudTx.id);
+                    const intId = Math.floor(parseFloat(cloudTx.id));
+                    const localTx = mergedMap.get(intId);
                     
                     if (!localTx) {
                         // ID 只存在于云端，直接添加
-                        mergedMap.set(cloudTx.id, {
+                        mergedMap.set(intId, {
                             ...cloudTx,
+                            id: intId,
                             is_deleted: cloudTx.is_deleted || false
                         });
                     } else {
@@ -2497,14 +2378,16 @@
                         
                         if (cloudUpdatedAt > localUpdatedAt) {
                             // 云端数据更新，使用云端数据
-                            mergedMap.set(cloudTx.id, {
+                            mergedMap.set(intId, {
                                 ...cloudTx,
+                                id: intId,
                                 is_deleted: cloudTx.is_deleted || false
                             });
                         } else {
                             // 本地数据更新，保留本地数据（但确保 is_deleted 字段存在）
-                            mergedMap.set(cloudTx.id, {
+                            mergedMap.set(intId, {
                                 ...localTx,
+                                id: intId,
                                 is_deleted: localTx.is_deleted || false
                             });
                         }
@@ -2560,18 +2443,31 @@
                         console.warn('⚠️ Failed to fetch credit cards:', cardError);
                     }
 
+                    // 3.6. 拉取每月固定消费数据
+                    const { data: recurringTransactions, error: recurringError } = await this.supabaseClient
+                        .from('recurring_transactions')
+                        .select('*')
+                        .eq('user_id', currentUser.id)
+                        .eq('is_deleted', false);
+
+                    if (recurringError && recurringError.code !== 'PGRST116') {
+                        console.warn('⚠️ Failed to fetch recurring transactions:', recurringError);
+                    }
+
                     // 4. 执行双向合并：获取本地数据并合并
                     const localTransactions = await this.localDB.getAll('transactions');
                     
-                    // 确保所有记录都有 is_deleted 字段
+                    // 确保所有记录都有 is_deleted 字段，并确保 ID 是整数
                     const normalizedCloud = (cloudTransactions || []).map(tx => ({
                         ...tx,
+                        id: Math.floor(parseFloat(tx.id)), // 确保 ID 是整数（BIGINT）
                         is_deleted: tx.is_deleted || false,
                         updated_at: tx.updated_at || new Date().toISOString()
                     }));
                     
                     const normalizedLocal = localTransactions.map(tx => ({
                         ...tx,
+                        id: Math.floor(parseFloat(tx.id)), // 确保 ID 是整数（BIGINT）
                         is_deleted: tx.is_deleted || false,
                         updated_at: tx.updated_at || new Date().toISOString()
                     }));
@@ -2582,11 +2478,9 @@
                     // 保存合并后的数据到本地（包括已删除的记录和信用卡字段）
                     let savedCount = 0;
                     for (const tx of mergedTransactions) {
-                        // 确保 ID 是整数（BIGINT）
-                        const txId = typeof tx.id === 'number' ? Math.floor(tx.id) : parseInt(tx.id, 10);
                         await this.localDB.put('transactions', {
-                            id: txId,
-                            amount: parseFloat(tx.amount),
+                            id: Math.floor(parseFloat(tx.id)), // 确保 ID 是整数（BIGINT）
+                            amount: roundToDecimal(parseFloat(tx.amount), 2), // 确保金额四舍五入到2位小数
                             date: tx.date,
                             note: tx.note || '',
                             category: tx.category,
@@ -2595,7 +2489,7 @@
                             paymentMethod: tx.payment_method || tx.paymentMethod || 'cash',
                             cardId: tx.card_id || tx.cardId || null,
                             installments: tx.installments || 1,
-                            interestRate: tx.interest_rate || tx.interestRate || 0,
+                            interestRate: roundToDecimal(tx.interest_rate || tx.interestRate || 0, 2), // 确保利率四舍五入到2位小数
                             billingMonth: tx.billing_month || tx.billingMonth || null,
                             updated_at: tx.updated_at,
                             is_deleted: tx.is_deleted || false
@@ -2618,41 +2512,20 @@
                         console.log(`✅ Pulled ${categories.length} categories from cloud`);
                     }
 
-                    // 处理信用卡数据（双向合并）
-                    const localCardsData = localStorage.getItem('ledger_cards_v13');
-                    const localCards = localCardsData ? JSON.parse(localCardsData) : [];
-                    
+                    // 处理信用卡数据
                     if (creditCards && creditCards.length > 0) {
-                        // 云端有数据：使用云端数据（因为云端数据更新）
                         state.cards = creditCards.map(card => ({
                             id: card.id,
                             name: card.name,
                             closingDay: card.closing_day,
                             dueDaysAfter: card.due_days_after,
-                            carryingBalance: parseFloat(card.carrying_balance) || 0,
-                            initialBalance: parseFloat(card.initial_balance) || 0,
+                            carryingBalance: roundToDecimal(parseFloat(card.carrying_balance) || 0, 2), // 确保余额四舍五入到2位小数
+                            initialBalance: roundToDecimal(parseFloat(card.initial_balance) || 0, 2), // 确保初始余额四舍五入到2位小数
                             updated_at: card.updated_at
                         }));
                         // 保存到 localStorage
                         localStorage.setItem('ledger_cards_v13', JSON.stringify(state.cards));
                         console.log(`✅ Pulled ${creditCards.length} credit cards from cloud`);
-                    } else if (creditCards && creditCards.length === 0) {
-                        // 云端没有数据：保留本地数据（如果本地有的话）
-                        if (localCards && localCards.length > 0) {
-                            state.cards = localCards;
-                            console.log(`ℹ️ No credit cards in cloud, keeping ${localCards.length} local cards`);
-                        } else {
-                            state.cards = [];
-                            console.log('ℹ️ No credit cards in cloud or local');
-                        }
-                    } else {
-                        // creditCards 为 null 或 undefined：保留本地数据
-                        if (localCards && localCards.length > 0) {
-                            state.cards = localCards;
-                            console.log(`ℹ️ Failed to fetch credit cards, keeping ${localCards.length} local cards`);
-                        } else {
-                            state.cards = [];
-                        }
                     }
 
                     if (settings) {
@@ -2663,52 +2536,56 @@
                         // 如果云端数据更新，或者本地没有更新时间戳，则更新本地设置
                         if (!localSettingsUpdatedAt || !cloudUpdatedAt || 
                             new Date(cloudUpdatedAt) > new Date(localSettingsUpdatedAt.value)) {
-                            await this.localDB.put('settings', { key: 'budget', value: parseFloat(settings.budget) });
+                            await this.localDB.put('settings', { key: 'budget', value: roundToDecimal(parseFloat(settings.budget), 2) }); // 确保预算四舍五入到2位小数
                             await this.localDB.put('settings', { key: 'themeId', value: settings.theme_id });
                             await this.localDB.put('settings', { key: 'currency', value: settings.currency });
                             
-                            // 同步自定义主题色
+                            // 同步自定义主题
                             if (settings.custom_theme) {
                                 await this.localDB.put('settings', { key: 'customTheme', value: settings.custom_theme });
                                 state.customTheme = settings.custom_theme;
                                 // 应用自定义主题
-                                document.documentElement.style.setProperty('--accent', state.customTheme.color);
-                                document.documentElement.style.setProperty('--accent-rgb', state.customTheme.rgb);
-                                document.documentElement.style.setProperty('--bg-deep', state.customTheme.bg);
-                                document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${state.customTheme.opacity})`);
-                            } else {
-                                // 如果云端没有自定义主题，清除本地自定义主题
-                                await this.localDB.delete('settings', 'customTheme');
-                                state.customTheme = null;
-                                // 应用默认主题
-                                if (typeof applyTheme === 'function') {
-                                    applyTheme(state.themeId);
+                                if (state.customTheme) {
+                                    document.documentElement.style.setProperty('--accent', state.customTheme.color);
+                                    document.documentElement.style.setProperty('--accent-rgb', state.customTheme.rgb);
+                                    document.documentElement.style.setProperty('--bg-deep', state.customTheme.bg);
+                                    document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${state.customTheme.opacity})`);
                                 }
                             }
                             
                             await this.localDB.put('settings', { key: 'settings_updated_at', value: cloudUpdatedAt });
                             
                             // 更新 state
-                            state.budget = parseFloat(settings.budget);
+                            state.budget = roundToDecimal(parseFloat(settings.budget), 2); // 确保预算四舍五入到2位小数
                             state.themeId = settings.theme_id;
                             state.currency = settings.currency;
                             
-                            // 同时保存到 localStorage 作为备份
-                            localStorage.setItem('ledger_budget_v13', state.budget);
-                            localStorage.setItem('ledger_theme_id_v13', state.themeId);
-                            localStorage.setItem('ledger_currency_v13', state.currency);
-                            localStorage.setItem('ledger_settings_updated_at_v13', cloudUpdatedAt);
-                            
-                            console.log('✅ Pulled user settings from cloud (updated, including custom theme and budget)');
+                            console.log('✅ Pulled user settings from cloud (updated)');
                         } else {
                             console.log('✅ Local settings are newer, keeping local version');
                         }
                     }
 
-                    // 确保所有数据都已保存（调用 save 函数来持久化）
-                    // 注意：这里不直接调用 save()，因为 save() 会触发同步，造成循环
-                    // 但我们已经手动保存了所有数据到 IndexedDB 和 localStorage
-                    
+                    // 处理每月固定消费数据
+                    if (recurringTransactions && recurringTransactions.length > 0) {
+                        state.recurringTransactions = recurringTransactions.map(recurring => ({
+                            id: recurring.id,
+                            note: recurring.note || null,
+                            amount: roundToDecimal(parseFloat(recurring.amount), 2), // 确保金额四舍五入到2位小数
+                            category: recurring.category,
+                            frequency: recurring.frequency,
+                            startDate: recurring.start_date,
+                            endDate: recurring.end_date || null,
+                            paymentMethod: recurring.payment_method || 'cash',
+                            cardId: recurring.card_id || null,
+                            lastCreated: recurring.last_created || null,
+                            updated_at: recurring.updated_at
+                        }));
+                        // 保存到 localStorage
+                        localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
+                        console.log(`✅ Pulled ${recurringTransactions.length} recurring transactions from cloud`);
+                    }
+
                     return { success: true };
 
                 } catch (error) {
@@ -2937,7 +2814,7 @@
                 const category = state.categories.find(c => c.name === recurring.category) || state.categories[0];
                 const transaction = {
                     id: Math.floor(Date.now() + Math.random() * 1000), // 确保 ID 是整数（BIGINT）
-                    amount: recurring.amount,
+                    amount: roundToDecimal(recurring.amount, 2), // 确保金额四舍五入到2位小数
                     note: recurring.note || `${recurring.category} (定期)`,
                     date: todayStr,
                     category: recurring.category,
@@ -3229,30 +3106,17 @@
 
         // 手动同步按钮（双向增量合并）
         async function manualSync() {
-            // 檢查 Supabase 客戶端
-            if (!supabaseClient) {
-                alert('⚠️ Supabase 未配置，無法使用雲端同步功能');
+            if (!syncManager || syncManager.isSyncing) {
+                console.warn('⚠️ Sync already in progress or syncManager not available');
                 return;
             }
 
-            // 檢查登入狀態
-            if (!currentUser || !state.isLoggedIn) {
-                alert('請先登入帳戶才能使用雲端同步功能');
-                showAuthPage();
-                return;
-            }
-
-            // 確保 syncManager 已初始化
-            if (!syncManager) {
-                console.log('🔄 Initializing syncManager...');
-                syncManager = new SyncManager(localDB, supabaseClient);
-                syncManager.lastSyncTime = await syncManager.getLastSyncTime();
-            }
-
-            if (syncManager.isSyncing) {
-                console.warn('⚠️ Sync already in progress');
-                alert('⚠️ 同步正在進行中，請稍候...');
-                return;
+            // 保存本地数据快照，用于失败时撤销
+            let localSnapshot = null;
+            try {
+                localSnapshot = await localDB.getAll('transactions');
+            } catch (e) {
+                console.warn('⚠️ Failed to create snapshot:', e);
             }
 
             updateSyncUI();
@@ -3270,80 +3134,17 @@
             
             try {
                 console.log('🔄 Starting bidirectional merge sync...');
-                console.log('📊 Sync status check:', {
-                    hasSyncManager: !!syncManager,
-                    hasSupabaseClient: !!supabaseClient,
-                    hasCurrentUser: !!currentUser,
-                    isLoggedIn: state.isLoggedIn,
-                    userId: currentUser?.id,
-                    userEmail: currentUser?.email,
-                    isSyncing: syncManager?.isSyncing,
-                    supabaseUrl: supabaseClient ? SUPABASE_CONFIG.url : 'not configured',
-                    currentUrl: window.location.href
-                });
                 
-                // 檢查 Supabase 客戶端是否正確初始化
-                if (!supabaseClient) {
-                    console.error('❌ Supabase client check failed:', {
-                        supabaseClient: supabaseClient,
-                        supabaseConfig: SUPABASE_CONFIG,
-                        supabaseLibAvailable: typeof supabase !== 'undefined' || typeof window.supabase !== 'undefined'
-                    });
-                    throw new Error('Supabase 客戶端未初始化，請檢查配置和網絡連接');
-                }
-                
-                // 檢查用戶是否已登入
-                if (!currentUser || !state.isLoggedIn) {
-                    console.error('❌ User check failed:', {
-                        currentUser: currentUser,
-                        isLoggedIn: state.isLoggedIn,
-                        userId: state.userId
-                    });
-                    throw new Error('用戶未登入，請先登入帳戶');
-                }
-                
-                // 驗證 Supabase 客戶端是否可用
-                try {
-                    const testSession = await supabaseClient.auth.getSession();
-                    console.log('✅ Supabase client is accessible');
-                } catch (testError) {
-                    console.error('❌ Supabase client test failed:', testError);
-                    throw new Error(`Supabase 客戶端無法訪問: ${testError.message}`);
-                }
-                
-                // 确保数据已加载（特别是信用卡和预算）
-                console.log('📊 Pre-sync data check:', {
-                    budget: state.budget,
-                    cardsCount: state.cards ? state.cards.length : 0,
-                    cards: state.cards
-                });
-                
-                // 如果数据未加载，先加载
-                if (!state.budget || (state.cards === undefined || state.cards === null)) {
-                    console.log('📂 Data not loaded, loading from local storage...');
-                    await loadDataFromLocal();
-                    console.log('📊 After load data:', {
-                        budget: state.budget,
-                        cardsCount: state.cards ? state.cards.length : 0
-                    });
-                }
-                
-                // syncToCloud() 會處理所有同步邏輯，包括雙向合併
-                // 如果同步失敗，本地數據不會被修改，所以不需要撤銷
-                console.log('📤 Calling syncToCloud()...');
+                // 步骤 A：获取云端和本地数据
+                // 步骤 B：执行双向合并
+                // 步骤 C：更新云端和本地
+                // 这些步骤都在 syncToCloud() 中完成
                 const result = await syncManager.syncToCloud();
-                
-                console.log('📊 Sync result:', result);
-                console.log('📊 Sync result details:', JSON.stringify(result, null, 2));
 
                 if (result.success) {
                     console.log('✅ Bidirectional merge sync completed');
                     
-                    // 同步分类和设置（僅在同步交易成功後執行）
-                    if (!supabaseClient || !currentUser) {
-                        throw new Error('Supabase 客戶端或用戶未初始化');
-                    }
-
+                    // 同步分类和设置
                     const categories = await localDB.getAll('categories');
                     if (categories.length > 0) {
                         const catData = categories.map(cat => ({
@@ -3355,46 +3156,38 @@
                             updated_at: cat.updated_at || new Date().toISOString()
                         }));
 
-                        const { error: catError } = await supabaseClient
+                        const { error: catError } = await syncManager.supabaseClient
                             .from('categories')
                             .upsert(catData, { onConflict: 'id' });
 
-                        if (catError) {
-                            console.warn('⚠️ Failed to sync categories:', catError);
-                            // 分類同步失敗不影響整體同步成功
-                        } else {
-                            console.log('✅ Synced categories');
-                        }
+                        if (catError) throw catError;
+                        console.log('✅ Synced categories');
                     }
                     
-                    // 同步设置
+                    // 同步设置（注意：syncToCloud() 已经处理了这些，这里是为了确保一致性）
                     const budgetSetting = await localDB.get('settings', 'budget');
                     const themeSetting = await localDB.get('settings', 'themeId');
-                    const currencySetting = await localDB.get('settings', 'currency');
                     const customThemeSetting = await localDB.get('settings', 'customTheme');
+                    const currencySetting = await localDB.get('settings', 'currency');
                     const settingsUpdatedAt = await localDB.get('settings', 'settings_updated_at');
 
                     const now = new Date().toISOString();
                     const settingsData = {
                         user_id: currentUser.id,
-                        budget: budgetSetting ? budgetSetting.value : 30000,
+                        budget: roundToDecimal(budgetSetting ? budgetSetting.value : 30000, 2), // 确保预算四舍五入到2位小数
                         theme_id: themeSetting ? themeSetting.value : 'minimal',
-                        currency: currencySetting ? currencySetting.value : 'TWD',
                         custom_theme: customThemeSetting ? customThemeSetting.value : null,
+                        currency: currencySetting ? currencySetting.value : 'TWD',
                         updated_at: settingsUpdatedAt ? settingsUpdatedAt.value : now,
                         last_sync_at: now
                     };
 
-                    const { error: settingsError } = await supabaseClient
+                    const { error: settingsError } = await syncManager.supabaseClient
                         .from('user_settings')
                         .upsert(settingsData, { onConflict: 'user_id' });
 
-                    if (settingsError) {
-                        console.warn('⚠️ Failed to sync settings:', settingsError);
-                        // 設置同步失敗不影響整體同步成功
-                    } else {
-                        console.log('✅ Synced user settings (including custom theme)');
-                    }
+                    if (settingsError) throw settingsError;
+                    console.log('✅ Synced user settings');
                     
                     // 记录最后同步时间
                     await syncManager.setLastSyncTime(new Date());
@@ -3410,73 +3203,42 @@
                     // 显示成功提示
                     alert('✅ 同步完成！所有更改已透過雙向合併儲存到雲端。');
                 } else {
-                    console.error('❌ Manual sync failed:', result);
-                    console.error('❌ Error details:', {
-                        error: result.error,
-                        errorType: typeof result.error,
-                        errorString: String(result.error)
-                    });
+                    console.warn('⚠️ Manual sync failed:', result.error);
                     
-                    // 同步失敗時，本地數據不會被修改（syncToCloud 在更新雲端失敗時不會修改本地）
-                    // 所以不需要撤銷本地更改，只需要提示用戶
-                    await loadDataFromLocal();
-                    renderAll();
-                    
-                    // 提供更詳細的錯誤信息
-                    let errorMessage = '同步失敗';
-                    let errorDetails = '';
-                    
-                    if (result.error === 'offline') {
-                        errorMessage = '無法連接到雲端';
-                        errorDetails = '請檢查：\n1. 網絡連接是否正常\n2. 是否已登入帳戶\n3. Supabase 服務是否可用';
-                    } else if (result.error === 'already_syncing') {
-                        errorMessage = '同步正在進行中';
-                        errorDetails = '請等待當前同步完成後再試';
-                    } else if (result.error && result.error.includes('timeout')) {
-                        errorMessage = '同步超時';
-                        errorDetails = '請檢查網絡連接後重試';
-                    } else if (result.errorCode) {
-                        // Supabase 錯誤代碼
-                        errorMessage = `同步失敗 [${result.errorCode}]`;
-                        errorDetails = `錯誤信息：${result.error}\n\n`;
-                        if (result.errorDetails) {
-                            errorDetails += `詳細信息：${result.errorDetails}\n\n`;
+                    // 撤销：恢复快照
+                    if (localSnapshot) {
+                        try {
+                            for (const tx of localSnapshot) {
+                                await localDB.put('transactions', tx);
+                            }
+                            await loadDataFromLocal();
+                            renderAll();
+                            console.log('✅ Local changes reverted');
+                        } catch (revertError) {
+                            console.error('❌ Failed to revert changes:', revertError);
                         }
-                        errorDetails += '請檢查：\n1. 網絡連接\n2. 是否已登入\n3. 數據庫權限設置\n4. 瀏覽器控制台（F12）的詳細錯誤';
-                    } else if (result.error) {
-                        errorMessage = '同步失敗';
-                        errorDetails = `錯誤信息：${result.error}\n\n請檢查：\n1. 網絡連接\n2. 是否已登入\n3. 瀏覽器控制台（F12）是否有更多錯誤信息`;
-                    } else {
-                        errorMessage = '同步失敗（未知錯誤）';
-                        errorDetails = '請打開瀏覽器控制台（F12）查看詳細錯誤信息';
                     }
                     
-                    alert(`⚠️ ${errorMessage}\n\n${errorDetails}\n\n您的本地數據已保留，可以稍後再試。`);
+                    alert('⚠️ 同步失敗：' + (result.error || '未知錯誤') + '\n\n本地更改已撤銷。');
                 }
             } catch (error) {
                 console.error('❌ Manual sync error:', error);
-                console.error('❌ Error stack:', error.stack);
-                console.error('❌ Error name:', error.name);
-                console.error('❌ Error message:', error.message);
                 
-                // 同步過程中出現異常，本地數據可能已經被部分修改
-                // 但由於 syncToCloud 的設計，如果更新雲端失敗，本地不會被修改
-                // 所以這裡也不需要撤銷，只需要重新加載本地數據
-                await loadDataFromLocal();
-                renderAll();
-                
-                // 提供更詳細的錯誤信息
-                let errorMessage = '同步過程中發生錯誤';
-                let errorDetails = '';
-                
-                if (error.message) {
-                    errorMessage = `同步錯誤：${error.message}`;
-                    errorDetails = `錯誤類型：${error.name || 'Unknown'}\n\n請檢查：\n1. 瀏覽器控制台（F12）的詳細錯誤\n2. 網絡連接是否正常\n3. 是否已登入帳戶`;
-                } else {
-                    errorDetails = '請打開瀏覽器控制台（F12）查看詳細錯誤信息';
+                // 撤销：恢复快照
+                if (localSnapshot) {
+                    try {
+                        for (const tx of localSnapshot) {
+                            await localDB.put('transactions', tx);
+                        }
+                        await loadDataFromLocal();
+                        renderAll();
+                        console.log('✅ Local changes reverted after error');
+                    } catch (revertError) {
+                        console.error('❌ Failed to revert changes:', revertError);
+                    }
                 }
                 
-                alert(`❌ ${errorMessage}\n\n${errorDetails}\n\n您的本地數據已保留，可以稍後再試。`);
+                alert('❌ 同步出錯：' + (error.message || '未知錯誤') + '\n\n本地更改已撤銷。');
             } finally {
                 clearTimeout(manualSyncTimeout);
                 // 确保同步状态被重置
@@ -3486,6 +3248,182 @@
                 }
                 updateSyncUI();
             }
+        }
+
+        // 同步诊断功能
+        async function diagnoseSync() {
+            console.log('🔍 Starting sync diagnosis...');
+            
+            const diagnostics = {
+                timestamp: new Date().toISOString(),
+                network: {
+                    online: navigator.onLine,
+                    status: navigator.onLine ? '✅ 在线' : '❌ 离线'
+                },
+                supabase: {
+                    configured: !!supabaseClient,
+                    initialized: !!supabaseClient,
+                    url: SUPABASE_CONFIG?.url || '未配置',
+                    status: supabaseClient ? '✅ 已初始化' : '❌ 未初始化'
+                },
+                user: {
+                    loggedIn: !!currentUser && !!state.isLoggedIn,
+                    userId: currentUser?.id || '未登录',
+                    email: currentUser?.email || '未登录',
+                    status: (currentUser && state.isLoggedIn) ? '✅ 已登录' : '❌ 未登录'
+                },
+                syncManager: {
+                    exists: !!syncManager,
+                    isSyncing: syncManager?.isSyncing || false,
+                    lastSyncTime: syncManager?.lastSyncTime ? syncManager.lastSyncTime.toISOString() : '从未同步',
+                    syncError: syncManager?.syncError || '无错误',
+                    status: syncManager ? '✅ 已初始化' : '❌ 未初始化'
+                },
+                localData: {
+                    transactions: state.transactions?.length || 0,
+                    categories: (await localDB.getAll('categories'))?.length || 0,
+                    status: '✅ 本地数据正常'
+                },
+                tests: []
+            };
+
+            // 测试 1: Supabase 连接测试
+            if (supabaseClient) {
+                try {
+                    const { data, error } = await supabaseClient.auth.getSession();
+                    if (error) {
+                        diagnostics.tests.push({
+                            name: 'Supabase 会话测试',
+                            status: '❌ 失败',
+                            error: error.message
+                        });
+                    } else {
+                        diagnostics.tests.push({
+                            name: 'Supabase 会话测试',
+                            status: data.session ? '✅ 成功' : '⚠️ 无会话',
+                            details: data.session ? `用户: ${data.session.user.email}` : '需要登录'
+                        });
+                    }
+                } catch (error) {
+                    diagnostics.tests.push({
+                        name: 'Supabase 会话测试',
+                        status: '❌ 异常',
+                        error: error.message
+                    });
+                }
+            }
+
+            // 测试 2: 数据库连接测试
+            if (supabaseClient && currentUser) {
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('transactions')
+                        .select('id')
+                        .eq('user_id', currentUser.id)
+                        .limit(1);
+                    
+                    if (error) {
+                        diagnostics.tests.push({
+                            name: '数据库连接测试',
+                            status: '❌ 失败',
+                            error: `${error.code}: ${error.message}`,
+                            hint: error.hint || '请检查数据库权限设置'
+                        });
+                    } else {
+                        diagnostics.tests.push({
+                            name: '数据库连接测试',
+                            status: '✅ 成功',
+                            details: `可以访问数据库，找到 ${data?.length || 0} 条记录`
+                        });
+                    }
+                } catch (error) {
+                    diagnostics.tests.push({
+                        name: '数据库连接测试',
+                        status: '❌ 异常',
+                        error: error.message
+                    });
+                }
+            }
+
+            // 生成诊断报告
+            let report = '🔍 同步诊断报告\n\n';
+            report += `时间: ${new Date().toLocaleString('zh-TW')}\n\n`;
+            
+            report += '📊 基本状态:\n';
+            report += `  网络: ${diagnostics.network.status}\n`;
+            report += `  Supabase: ${diagnostics.supabase.status}\n`;
+            report += `  用户: ${diagnostics.user.status}\n`;
+            report += `  同步管理器: ${diagnostics.syncManager.status}\n\n`;
+
+            if (diagnostics.user.loggedIn) {
+                report += `  用户 ID: ${diagnostics.user.userId}\n`;
+                report += `  用户邮箱: ${diagnostics.user.email}\n`;
+            }
+            
+            report += `  本地交易数: ${diagnostics.localData.transactions}\n`;
+            report += `  本地分类数: ${diagnostics.localData.categories}\n\n`;
+
+            if (diagnostics.syncManager.lastSyncTime !== '从未同步') {
+                const lastSync = new Date(diagnostics.syncManager.lastSyncTime);
+                const timeDiff = Date.now() - lastSync.getTime();
+                const minutes = Math.floor(timeDiff / 60000);
+                report += `  最后同步: ${minutes} 分钟前\n`;
+            }
+
+            if (diagnostics.syncManager.syncError && diagnostics.syncManager.syncError !== '无错误') {
+                report += `  同步错误: ${diagnostics.syncManager.syncError}\n`;
+            }
+
+            report += '\n🧪 连接测试:\n';
+            if (diagnostics.tests.length === 0) {
+                report += '  ⚠️ 无法执行测试（Supabase 未配置或用户未登录）\n';
+            } else {
+                diagnostics.tests.forEach(test => {
+                    report += `  ${test.name}: ${test.status}\n`;
+                    if (test.error) {
+                        report += `    错误: ${test.error}\n`;
+                    }
+                    if (test.hint) {
+                        report += `    提示: ${test.hint}\n`;
+                    }
+                    if (test.details) {
+                        report += `    详情: ${test.details}\n`;
+                    }
+                });
+            }
+
+            report += '\n💡 建议:\n';
+            
+            if (!diagnostics.network.online) {
+                report += '  ❌ 网络离线，请检查网络连接\n';
+            }
+            
+            if (!diagnostics.supabase.configured) {
+                report += '  ❌ Supabase 未配置，无法使用云端同步\n';
+            } else if (!diagnostics.user.loggedIn) {
+                report += '  ⚠️ 请先登录账户才能使用云端同步\n';
+            } else {
+                const failedTests = diagnostics.tests.filter(t => t.status.includes('❌'));
+                if (failedTests.length > 0) {
+                    report += '  ⚠️ 检测到连接问题，请检查:\n';
+                    failedTests.forEach(test => {
+                        report += `    - ${test.name}: ${test.error || '未知错误'}\n`;
+                    });
+                    report += '  💡 请检查浏览器控制台（F12）获取更多信息\n';
+                } else {
+                    report += '  ✅ 所有检查通过，应该可以正常同步\n';
+                    report += '  💡 如果仍然无法同步，请查看浏览器控制台的错误信息\n';
+                }
+            }
+
+            // 输出到控制台
+            console.log('🔍 诊断结果:', diagnostics);
+            console.log(report);
+
+            // 显示给用户
+            alert(report);
+            
+            return diagnostics;
         }
 
         // 检查网络状态
@@ -3607,6 +3545,15 @@
                     supabaseClient.auth.onAuthStateChange(async (event, session) => {
                         console.log('🔐 Auth state changed:', event, session?.user?.email || 'no user');
                         
+                        // 如果是登录代码验证触发的登录，跳过自动处理（已在 verifyLoginCode 中处理）
+                        if (event === 'SIGNED_IN' && session && !isProcessingMagicLink) {
+                            // 检查是否是通过登录代码登录的（通过检查是否有 currentUser）
+                            if (currentUser && currentUser.id === session.user.id) {
+                                console.log('ℹ️ Login code login detected, skipping auto-handle');
+                                return;
+                            }
+                        }
+                        
                         if (event === 'SIGNED_IN' && session) {
                             currentUser = session.user;
                             state.isLoggedIn = true;
@@ -3687,7 +3634,6 @@
                                     await syncManager.syncFromCloud();
                                     // 重新加载合并后的数据
                                     await loadDataFromLocal();
-                                    renderAll();
                                 }
                                 
                                 console.log(`✅ Data synchronized. Showing ${state.transactions.length} transactions.`);
@@ -3701,7 +3647,6 @@
                             // 刷新UI（确保数据已显示）
                             renderAll();
                             updateAuthUI();
-                            updateSyncUI();
                             console.log('✅ UI refreshed after login');
                             
                             // 重置 Magic Link 处理标记
@@ -3799,7 +3744,6 @@
                                         await syncManager.syncFromCloud();
                                         // 重新加载合并后的数据
                                         await loadDataFromLocal();
-                                        renderAll();
                                     }
                                     
                                     console.log(`✅ Data synchronized. Showing ${state.transactions.length} transactions.`);
@@ -3813,7 +3757,6 @@
                                 showMainApp();
                                 renderAll();
                                 updateAuthUI();
-                                updateSyncUI();
                             }
                         }
                         
@@ -5528,8 +5471,8 @@
             }
             
             const data = { 
-                id: state.editingId ? (typeof state.editingId === 'number' ? Math.floor(state.editingId) : parseInt(state.editingId, 10)) : Math.floor(Date.now()), 
-                amount: amt, 
+                id: Math.floor(state.editingId || Date.now()), // 确保 ID 是整数（BIGINT）
+                amount: roundToDecimal(amt, 2), // 确保金额四舍五入到2位小数
                 currency: state.tempCurrency || state.currency,
                 date: date, 
                 note: document.getElementById('formNote').value, 
@@ -5538,7 +5481,7 @@
                 paymentMethod: state.tempPaymentMethod || 'cash', // 支付方式，預設現金（相容舊資料）
                 cardId: state.tempPaymentMethod === 'credit' ? state.tempCardId : null, // 信用卡 ID
                 installments: installmentsValue, // 分期期数，預設1（相容舊資料）
-                interestRate: interestRateValue, // 年利率（%），預設0（相容舊資料）
+                interestRate: roundToDecimal(interestRateValue, 2), // 年利率（%），預設0，四舍五入到2位小数
                 billingMonth: billingMonth, // 首期账单月份（YYYY-MM）
                 updated_at: new Date().toISOString(),
                 is_deleted: false  // 确保新记录标记为未删除
@@ -6344,6 +6287,7 @@
                 return;
             }
             
+            const roundedInitialBalance = roundToDecimal(initialBalance, 2); // 确保初始余额四舍五入到2位小数
             if (editingCardId) {
                 // 编辑（保留原有的 carryingBalance）
                 const idx = state.cards.findIndex(c => c.id === editingCardId);
@@ -6354,8 +6298,8 @@
                         name,
                         closingDay,
                         dueDaysAfter: dueDays,
-                        carryingBalance: existingCard.carryingBalance || 0, // 保留结转余额
-                        initialBalance: initialBalance // 更新初始欠款
+                        carryingBalance: roundToDecimal(existingCard.carryingBalance || 0, 2), // 保留结转余额，四舍五入到2位小数
+                        initialBalance: roundedInitialBalance // 更新初始欠款
                     };
                 }
             } else {
@@ -6366,7 +6310,7 @@
                     closingDay,
                     dueDaysAfter: dueDays,
                     carryingBalance: 0, // 初始结转余额为0
-                    initialBalance: initialBalance // 初始未繳清餘額
+                    initialBalance: roundedInitialBalance // 初始未繳清餘額
                 };
                 state.cards.push(newCard);
             }
@@ -6492,33 +6436,37 @@
                 return;
             }
             
+            const now = new Date().toISOString();
+            const roundedAmount = roundToDecimal(amount, 2); // 确保金额四舍五入到2位小数
             if (editingRecurringId) {
                 const index = state.recurringTransactions.findIndex(r => r.id === editingRecurringId);
                 if (index !== -1) {
                     state.recurringTransactions[index] = {
                         ...state.recurringTransactions[index],
                         note,
-                        amount,
+                        amount: roundedAmount,
                         category,
                         frequency,
                         startDate,
                         endDate,
                         paymentMethod,
-                        cardId
+                        cardId,
+                        updated_at: now
                     };
                 }
             } else {
                 const recurring = {
-                    id: Date.now(),
+                    id: Date.now().toString(),
                     note,
-                    amount,
+                    amount: roundedAmount,
                     category,
                     frequency,
                     startDate,
                     endDate,
                     paymentMethod,
                     cardId,
-                    lastCreated: null
+                    lastCreated: null,
+                    updated_at: now
                 };
                 state.recurringTransactions.push(recurring);
             }
@@ -6533,7 +6481,12 @@
         async function deleteRecurring(recurringId) {
             if (!confirm('確定要刪除此定期交易嗎？')) return;
             
-            state.recurringTransactions = state.recurringTransactions.filter(r => r.id !== recurringId);
+            // 标记为已删除而不是直接删除，以便同步到云端
+            const index = state.recurringTransactions.findIndex(r => r.id === recurringId);
+            if (index !== -1) {
+                state.recurringTransactions[index].is_deleted = true;
+                state.recurringTransactions[index].updated_at = new Date().toISOString();
+            }
             localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
             renderSettings();
         }
@@ -6587,11 +6540,11 @@
             if (cardIndex !== -1) {
                 // 更新已還款總額（修復初始餘額重複計算 BUG）
                 const currentRepaid = state.cards[cardIndex].totalRepaid || 0;
-                state.cards[cardIndex].totalRepaid = currentRepaid + paymentAmount;
+                state.cards[cardIndex].totalRepaid = roundToDecimal(currentRepaid + paymentAmount, 2); // 确保已还金额四舍五入到2位小数
                 
                 if (remaining > 0) {
                     // 有剩余，更新结转余额（累加到下月）
-                    state.cards[cardIndex].carryingBalance = remaining;
+                    state.cards[cardIndex].carryingBalance = roundToDecimal(remaining, 2); // 确保结转余额四舍五入到2位小数
                 } else {
                     // 已缴清，清零结转余额
                     state.cards[cardIndex].carryingBalance = 0;
@@ -6760,23 +6713,47 @@
                 showAuthMessage('✅ 代碼驗證成功！正在登入...', 'success');
                 
                 // 使用 setSession 方法來登入
+                console.log('🔐 Setting session with tokens...');
                 const { data: sessionData, error: sessionError } = await supabaseClient.auth.setSession({
                     access_token: codeData.access_token,
                     refresh_token: codeData.refresh_token
                 });
 
-                if (sessionError) throw sessionError;
+                if (sessionError) {
+                    console.error('❌ Set session error:', sessionError);
+                    throw new Error('設定登入 session 失敗：' + (sessionError.message || 'Token 可能已過期，請重新產生登入代碼'));
+                }
+
+                if (!sessionData || !sessionData.user) {
+                    console.error('❌ No user data in session');
+                    throw new Error('無法獲取用戶資訊，請重新產生登入代碼');
+                }
+
+                console.log('✅ Session set successfully. User:', sessionData.user.email);
 
                 // 標記代碼為已使用
-                await supabaseClient
-                    .from('login_codes')
-                    .update({ used_at: new Date().toISOString() })
-                    .eq('code', codeInput);
+                try {
+                    await supabaseClient
+                        .from('login_codes')
+                        .update({ used_at: new Date().toISOString() })
+                        .eq('code', codeInput);
+                } catch (markError) {
+                    console.warn('⚠️ Failed to mark code as used:', markError);
+                    // 标记失败不影响登录流程
+                }
 
-                // 登入成功
+                // 登入成功 - 设置用户信息
                 currentUser = sessionData.user;
                 state.isLoggedIn = true;
                 state.userId = currentUser.id;
+                
+                console.log('✅ Login code verified successfully. User:', currentUser.email);
+                
+                // 初始化同步管理器（如果还没有）
+                if (!syncManager) {
+                    syncManager = new SyncManager(localDB, supabaseClient);
+                    console.log('✅ SyncManager initialized after code login');
+                }
                 
                 showAuthMessage(`✅ 登入成功！<br><br>
                     <div class="text-left bg-green-500/10 border border-green-500/30 rounded-xl p-4 mt-3">
@@ -6787,28 +6764,28 @@
                 // 清空輸入
                 document.getElementById('loginCode').value = '';
                 
-                // 確保同步管理器已初始化
-                if (!syncManager) {
-                    syncManager = new SyncManager(localDB, supabaseClient);
-                    syncManager.lastSyncTime = await syncManager.getLastSyncTime();
-                }
-
                 // 跳轉到主頁面（从云端拉取数据，确保所有设备数据一致）
                 setTimeout(async () => {
-                    // 从云端拉取数据（确保所有设备数据一致，但不自动上传）
                     try {
+                        // 确保本地数据已加载
+                        await loadDataFromLocal();
+                        
+                        // 从云端拉取数据（确保所有设备数据一致）
                         console.log('🔄 Pulling data from cloud after code login to ensure consistency...');
                         await syncManager.syncFromCloud();
                         await loadDataFromLocal();
                         console.log('✅ Data pulled from cloud. All devices will show the same data.');
                     } catch (error) {
                         console.warn('⚠️ Failed to pull data from cloud:', error);
+                        // 即使拉取失败，也确保加载本地数据
                         await loadDataFromLocal();
                     }
+                    
+                    // 显示主应用
                     showMainApp();
                     renderAll();
                     updateAuthUI();
-                    updateSyncUI();
+                    console.log('✅ UI updated after code login');
                 }, 1500);
 
             } catch (error) {

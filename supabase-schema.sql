@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
     budget NUMERIC(10, 2) DEFAULT 30000,
     theme_id TEXT DEFAULT 'minimal',
+    custom_theme JSONB,
     currency TEXT DEFAULT 'TWD',
     last_sync_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -78,12 +79,31 @@ CREATE TABLE IF NOT EXISTS public.login_codes (
     used_at TIMESTAMPTZ
 );
 
+-- 5.6 创建每月固定消费表 (recurring_transactions)
+CREATE TABLE IF NOT EXISTS public.recurring_transactions (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    note TEXT,
+    amount NUMERIC(10, 2) NOT NULL,
+    category TEXT NOT NULL,
+    frequency TEXT NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly', 'yearly')),
+    start_date DATE NOT NULL,
+    end_date DATE,
+    payment_method TEXT DEFAULT 'cash',
+    card_id TEXT,
+    last_created DATE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    is_deleted BOOLEAN DEFAULT FALSE
+);
+
 -- 6. 创建索引以提升查询性能
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON public.transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON public.transactions(date DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_updated_at ON public.transactions(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_categories_user_id ON public.categories(user_id);
 CREATE INDEX IF NOT EXISTS idx_credit_cards_user_id ON public.credit_cards(user_id);
+CREATE INDEX IF NOT EXISTS idx_recurring_transactions_user_id ON public.recurring_transactions(user_id);
 
 -- 7. 创建触发器函数：自动更新 updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -116,6 +136,12 @@ CREATE TRIGGER update_user_settings_updated_at
 DROP TRIGGER IF EXISTS update_credit_cards_updated_at ON public.credit_cards;
 CREATE TRIGGER update_credit_cards_updated_at
     BEFORE UPDATE ON public.credit_cards
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_recurring_transactions_updated_at ON public.recurring_transactions;
+CREATE TRIGGER update_recurring_transactions_updated_at
+    BEFORE UPDATE ON public.recurring_transactions
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
@@ -181,6 +207,7 @@ ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.credit_cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.login_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.recurring_transactions ENABLE ROW LEVEL SECURITY;
 
 -- 12. 删除旧的策略（如果存在）
 DROP POLICY IF EXISTS "Users can view own transactions" ON public.transactions;
@@ -279,6 +306,24 @@ CREATE POLICY "Users can insert own login codes"
 CREATE POLICY "Anyone can read valid login codes"
     ON public.login_codes FOR SELECT
     USING (expires_at > NOW() AND used_at IS NULL);
+
+-- 15.6 创建 RLS 策略：Recurring Transactions 表
+CREATE POLICY "Users can view own recurring transactions"
+    ON public.recurring_transactions FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own recurring transactions"
+    ON public.recurring_transactions FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own recurring transactions"
+    ON public.recurring_transactions FOR UPDATE
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own recurring transactions"
+    ON public.recurring_transactions FOR DELETE
+    USING (auth.uid() = user_id);
 
 -- ============================================
 -- 数据库函数：批量 Upsert（用于同步）
