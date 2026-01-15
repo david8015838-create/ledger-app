@@ -19,6 +19,16 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // 確保 Supabase 加載完成
+        window.addEventListener('load', () => {
+            if (typeof supabase === 'undefined' && typeof window.supabase === 'undefined') {
+                console.error('❌ Supabase library failed to load from CDN');
+            } else {
+                console.log('✅ Supabase library loaded:', typeof supabase !== 'undefined' ? 'global supabase' : 'window.supabase');
+            }
+        });
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
 
