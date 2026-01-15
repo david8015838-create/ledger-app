@@ -2048,8 +2048,9 @@
                     // 先更新云端：上传完整的合并数据（包括已删除的和信用卡字段）
                     // 只有在云端更新成功后才更新本地，避免数据不一致
                     if (mergedTransactions.length > 0) {
-                        // 構建交易數據，只包含存在的欄位
+                        // 構建交易數據，使用最基礎的欄位（確保所有數據庫結構都支持）
                         const txData = mergedTransactions.map(tx => {
+                            // 基礎欄位（所有數據庫都應該有）
                             const data = {
                                 id: tx.id,
                                 user_id: currentUser.id,
@@ -2059,29 +2060,20 @@
                                 category: tx.category,
                                 icon: tx.icon,
                                 currency: tx.currency || 'TWD',
-                                payment_method: tx.paymentMethod || tx.payment_method || 'cash',
-                                card_id: tx.cardId || tx.card_id || null,
-                                installments: tx.installments || 1,
-                                interest_rate: tx.interestRate || tx.interest_rate || 0,
                                 updated_at: tx.updated_at,
                                 is_deleted: tx.is_deleted || false
                             };
                             
-                            // 只有在有值時才添加 billing_month（避免欄位不存在錯誤）
-                            const billingMonth = tx.billingMonth || tx.billing_month;
-                            if (billingMonth) {
-                                data.billing_month = billingMonth;
-                            }
-                            
                             return data;
                         });
 
-                        console.log(`📤 Uploading ${txData.length} transactions to cloud...`);
+                        console.log(`📤 Uploading ${txData.length} transactions to cloud (basic fields only)...`);
                         
-                        // 嘗試上傳，如果失敗且是因為 billing_month 欄位不存在，則重試不包含該欄位
+                        // 智能上傳：先嘗試基礎欄位，如果成功再嘗試添加可選欄位
                         let txError = null;
                         let uploadAttempt = 0;
-                        const maxAttempts = 2;
+                        const maxAttempts = 3;
+                        let optionalFields = ['payment_method', 'card_id', 'installments', 'interest_rate', 'billing_month'];
                         
                         while (uploadAttempt < maxAttempts) {
                             try {
@@ -2090,20 +2082,86 @@
                                     .upsert(txData, { onConflict: 'id' });
                                 
                                 if (!error) {
+                                    // 成功！如果這是第一次嘗試（只有基礎欄位），嘗試添加可選欄位
+                                    if (uploadAttempt === 0 && optionalFields.length > 0) {
+                                        console.log('✅ Basic upload successful, trying to add optional fields...');
+                                        // 嘗試添加可選欄位
+                                        const txDataWithOptional = mergedTransactions.map(tx => {
+                                            const data = {
+                                                id: tx.id,
+                                                user_id: currentUser.id,
+                                                amount: tx.amount,
+                                                date: tx.date,
+                                                note: tx.note || '',
+                                                category: tx.category,
+                                                icon: tx.icon,
+                                                currency: tx.currency || 'TWD',
+                                                updated_at: tx.updated_at,
+                                                is_deleted: tx.is_deleted || false
+                                            };
+                                            
+                                            // 嘗試添加可選欄位
+                                            const paymentMethod = tx.paymentMethod || tx.payment_method;
+                                            if (paymentMethod && paymentMethod !== 'cash') {
+                                                data.payment_method = paymentMethod;
+                                            }
+                                            
+                                            const cardId = tx.cardId || tx.card_id;
+                                            if (cardId) {
+                                                data.card_id = cardId;
+                                            }
+                                            
+                                            const installments = tx.installments;
+                                            if (installments && installments > 1) {
+                                                data.installments = installments;
+                                            }
+                                            
+                                            const interestRate = tx.interestRate || tx.interest_rate;
+                                            if (interestRate && interestRate > 0) {
+                                                data.interest_rate = interestRate;
+                                            }
+                                            
+                                            const billingMonth = tx.billingMonth || tx.billing_month;
+                                            if (billingMonth) {
+                                                data.billing_month = billingMonth;
+                                            }
+                                            
+                                            return data;
+                                        });
+                                        
+                                        // 嘗試上傳包含可選欄位的數據
+                                        const { error: optionalError } = await this.supabaseClient
+                                            .from('transactions')
+                                            .upsert(txDataWithOptional, { onConflict: 'id' });
+                                        
+                                        if (!optionalError) {
+                                            console.log('✅ Successfully uploaded with optional fields');
+                                        } else {
+                                            console.warn('⚠️ Optional fields not supported, but basic sync succeeded');
+                                            console.warn('⚠️ Optional fields error:', optionalError.message);
+                                        }
+                                    }
                                     // 成功，跳出循環
                                     break;
                                 }
                                 
-                                // 如果是 billing_month 欄位錯誤，移除該欄位後重試
-                                if (error.code === 'PGRST204' && error.message && error.message.includes('billing_month')) {
-                                    console.warn('⚠️ billing_month column not found, retrying without it...');
-                                    // 移除所有交易的 billing_month 欄位
-                                    txData = txData.map(tx => {
-                                        const { billing_month, ...rest } = tx;
-                                        return rest;
-                                    });
-                                    uploadAttempt++;
-                                    continue;
+                                // 如果是欄位不存在的錯誤，移除該欄位後重試
+                                if (error.code === 'PGRST204' && error.message) {
+                                    const missingField = error.message.match(/column '(\w+)'/);
+                                    if (missingField && missingField[1]) {
+                                        const fieldName = missingField[1];
+                                        console.warn(`⚠️ Column '${fieldName}' not found, removing from data and retrying...`);
+                                        
+                                        // 從所有交易中移除該欄位
+                                        txData.forEach(tx => {
+                                            delete tx[fieldName];
+                                        });
+                                        
+                                        // 從可選欄位列表中移除
+                                        optionalFields = optionalFields.filter(f => f !== fieldName);
+                                        uploadAttempt++;
+                                        continue;
+                                    }
                                 }
                                 
                                 // 其他錯誤，直接拋出
