@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>同步功能測試</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0a0a0c;
+            color: #fff;
+        }
+        .test-section {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .log {
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .error { color: #ef4444; }
+        .success { color: #10b981; }
+        .warning { color: #f59e0b; }
+        .info { color: #3b82f6; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>🔍 同步功能測試工具</h1>
+    
+    <div class="test-section">
+        <h2>1. Supabase 連接測試</h2>
+        <button onclick="testSupabaseConnection()">測試連接</button>
+        <div id="connectionResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. 認證狀態檢查</h2>
+        <button onclick="checkAuthStatus()">檢查認證</button>
+        <div id="authResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. 數據庫表檢查</h2>
+        <button onclick="checkTables()">檢查表結構</button>
+        <div id="tablesResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. 同步功能測試</h2>
+        <button onclick="testSync()">測試同步</button>
+        <div id="syncResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>📋 測試日誌</h2>
+        <div id="log" class="log"></div>
+        <button onclick="clearLog()">清除日誌</button>
+    </div>
+
+    <script>
+        const SUPABASE_CONFIG = {
+            url: 'https://ndtkurowumazsgdotlxb.supabase.co',
+            anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kdGt1cm93dW1henNnZG90bHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMzUwMzUsImV4cCI6MjA4MzgxMTAzNX0.tukEU-T8f8Sne7KRFOPBYgtlhalHWaPMJlZ_Qpa6J6E'
+        };
+
+        let supabaseClient = null;
+        let currentUser = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const className = type;
+            logDiv.innerHTML += `<div class="${className}">[${time}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}]`, message);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        async function testSupabaseConnection() {
+            log('開始測試 Supabase 連接...', 'info');
+            const resultDiv = document.getElementById('connectionResult');
+            resultDiv.innerHTML = '<p>測試中...</p>';
+
+            try {
+                supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+                log('✅ Supabase 客戶端創建成功', 'success');
+                
+                // 測試簡單查詢
+                const { data, error } = await supabaseClient.from('transactions').select('count').limit(0);
+                
+                if (error) {
+                    log(`❌ 連接測試失敗: ${error.message}`, 'error');
+                    log(`錯誤代碼: ${error.code}`, 'error');
+                    log(`錯誤詳情: ${JSON.stringify(error, null, 2)}`, 'error');
+                    resultDiv.innerHTML = `<p class="error">❌ 連接失敗: ${error.message}</p>`;
+                } else {
+                    log('✅ Supabase 連接成功！', 'success');
+                    resultDiv.innerHTML = '<p class="success">✅ 連接成功！</p>';
+                }
+            } catch (error) {
+                log(`❌ 初始化失敗: ${error.message}`, 'error');
+                log(`錯誤堆棧: ${error.stack}`, 'error');
+                resultDiv.innerHTML = `<p class="error">❌ 初始化失敗: ${error.message}</p>`;
+            }
+        }
+
+        async function checkAuthStatus() {
+            log('檢查認證狀態...', 'info');
+            const resultDiv = document.getElementById('authResult');
+            resultDiv.innerHTML = '<p>檢查中...</p>';
+
+            if (!supabaseClient) {
+                log('⚠️ 請先測試 Supabase 連接', 'warning');
+                resultDiv.innerHTML = '<p class="warning">⚠️ 請先測試 Supabase 連接</p>';
+                return;
+            }
+
+            try {
+                const { data: { session }, error } = await supabaseClient.auth.getSession();
+                
+                if (error) {
+                    log(`❌ 獲取 session 失敗: ${error.message}`, 'error');
+                    resultDiv.innerHTML = `<p class="error">❌ ${error.message}</p>`;
+                } else if (session) {
+                    currentUser = session.user;
+                    log(`✅ 已登入: ${currentUser.email}`, 'success');
+                    log(`用戶 ID: ${currentUser.id}`, 'info');
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ 已登入</p>
+                        <p>Email: ${currentUser.email}</p>
+                        <p>User ID: ${currentUser.id}</p>
+                    `;
+                } else {
+                    log('⚠️ 未登入', 'warning');
+                    resultDiv.innerHTML = '<p class="warning">⚠️ 未登入，請先登入帳戶</p>';
+                }
+            } catch (error) {
+                log(`❌ 檢查認證失敗: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<p class="error">❌ ${error.message}</p>`;
+            }
+        }
+
+        async function checkTables() {
+            log('檢查數據庫表...', 'info');
+            const resultDiv = document.getElementById('tablesResult');
+            resultDiv.innerHTML = '<p>檢查中...</p>';
+
+            if (!supabaseClient) {
+                log('⚠️ 請先測試 Supabase 連接', 'warning');
+                resultDiv.innerHTML = '<p class="warning">⚠️ 請先測試 Supabase 連接</p>';
+                return;
+            }
+
+            const tables = ['transactions', 'categories', 'user_settings', 'credit_cards', 'login_codes'];
+            let results = '<h3>表檢查結果：</h3>';
+
+            for (const table of tables) {
+                try {
+                    const { data, error } = await supabaseClient
+                        .from(table)
+                        .select('*')
+                        .limit(1);
+                    
+                    if (error) {
+                        log(`❌ ${table}: ${error.message}`, 'error');
+                        results += `<p class="error">❌ ${table}: ${error.message}</p>`;
+                    } else {
+                        log(`✅ ${table}: 表存在`, 'success');
+                        results += `<p class="success">✅ ${table}: 表存在</p>`;
+                    }
+                } catch (error) {
+                    log(`❌ ${table}: ${error.message}`, 'error');
+                    results += `<p class="error">❌ ${table}: ${error.message}</p>`;
+                }
+            }
+
+            resultDiv.innerHTML = results;
+        }
+
+        async function testSync() {
+            log('開始測試同步功能...', 'info');
+            const resultDiv = document.getElementById('syncResult');
+            resultDiv.innerHTML = '<p>測試中...</p>';
+
+            if (!supabaseClient) {
+                log('⚠️ 請先測試 Supabase 連接', 'warning');
+                resultDiv.innerHTML = '<p class="warning">⚠️ 請先測試 Supabase 連接</p>';
+                return;
+            }
+
+            if (!currentUser) {
+                log('⚠️ 請先檢查認證狀態並登入', 'warning');
+                resultDiv.innerHTML = '<p class="warning">⚠️ 請先登入帳戶</p>';
+                return;
+            }
+
+            try {
+                // 測試查詢交易
+                log('測試查詢交易數據...', 'info');
+                const { data: transactions, error: txError } = await supabaseClient
+                    .from('transactions')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .limit(5);
+
+                if (txError) {
+                    log(`❌ 查詢交易失敗: ${txError.message}`, 'error');
+                    log(`錯誤代碼: ${txError.code}`, 'error');
+                    log(`錯誤詳情: ${JSON.stringify(txError, null, 2)}`, 'error');
+                    resultDiv.innerHTML = `<p class="error">❌ 查詢失敗: ${txError.message}</p>`;
+                    return;
+                }
+
+                log(`✅ 查詢成功，找到 ${transactions?.length || 0} 筆交易`, 'success');
+
+                // 測試插入（如果沒有數據）
+                if (!transactions || transactions.length === 0) {
+                    log('測試插入交易數據...', 'info');
+                    const testTx = {
+                        id: crypto.randomUUID(),
+                        user_id: currentUser.id,
+                        amount: 100,
+                        date: new Date().toISOString().split('T')[0],
+                        note: '測試交易',
+                        category: '測試',
+                        icon: '🧪',
+                        currency: 'TWD',
+                        payment_method: 'cash',
+                        updated_at: new Date().toISOString(),
+                        is_deleted: false
+                    };
+
+                    const { data: inserted, error: insertError } = await supabaseClient
+                        .from('transactions')
+                        .insert([testTx])
+                        .select();
+
+                    if (insertError) {
+                        log(`❌ 插入失敗: ${insertError.message}`, 'error');
+                        log(`錯誤代碼: ${insertError.code}`, 'error');
+                        log(`錯誤詳情: ${JSON.stringify(insertError, null, 2)}`, 'error');
+                        resultDiv.innerHTML = `<p class="error">❌ 插入失敗: ${insertError.message}</p>`;
+                    } else {
+                        log('✅ 插入測試成功', 'success');
+                        resultDiv.innerHTML = '<p class="success">✅ 同步功能正常！</p>';
+                    }
+                } else {
+                    log('✅ 同步功能正常！', 'success');
+                    resultDiv.innerHTML = '<p class="success">✅ 同步功能正常！</p>';
+                }
+            } catch (error) {
+                log(`❌ 同步測試失敗: ${error.message}`, 'error');
+                log(`錯誤堆棧: ${error.stack}`, 'error');
+                resultDiv.innerHTML = `<p class="error">❌ ${error.message}</p>`;
+            }
+        }
+
+        // 初始化
+        window.onload = () => {
+            log('測試工具已載入', 'info');
+            log('請按順序執行測試：1. 連接測試 → 2. 認證檢查 → 3. 表檢查 → 4. 同步測試', 'info');
+        };
+    </script>
+</body>
+</html>

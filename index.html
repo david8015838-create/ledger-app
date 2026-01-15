@@ -2204,13 +2204,42 @@
 
                 } catch (error) {
                     console.error('❌ Sync failed:', error);
+                    console.error('❌ Error details:', {
+                        name: error.name,
+                        message: error.message,
+                        code: error.code,
+                        details: error.details,
+                        hint: error.hint,
+                        stack: error.stack
+                    });
                     clearTimeout(syncTimeout);
-                    this.syncError = error.message || '未知错误';
+                    
+                    // 提取更詳細的錯誤信息
+                    let errorMessage = '未知错误';
+                    if (error.message) {
+                        errorMessage = error.message;
+                    } else if (error.details) {
+                        errorMessage = error.details;
+                    } else if (error.hint) {
+                        errorMessage = error.hint;
+                    }
+                    
+                    // 如果是 Supabase 錯誤，提取更多信息
+                    if (error.code) {
+                        errorMessage = `[${error.code}] ${errorMessage}`;
+                    }
+                    
+                    this.syncError = errorMessage;
                     this.isSyncing = false;
                     updateSyncUI();
 
-                    // 靜默處理錯誤，不影響使用者體驗
-                    return { success: false, error: this.syncError };
+                    // 返回詳細錯誤信息
+                    return { 
+                        success: false, 
+                        error: errorMessage,
+                        errorCode: error.code,
+                        errorDetails: error.details || error.hint
+                    };
                 } finally {
                     // 确保状态总是被重置
                     clearTimeout(syncTimeout);
@@ -3080,9 +3109,17 @@
                     } else if (result.error && result.error.includes('timeout')) {
                         errorMessage = '同步超時';
                         errorDetails = '請檢查網絡連接後重試';
+                    } else if (result.errorCode) {
+                        // Supabase 錯誤代碼
+                        errorMessage = `同步失敗 [${result.errorCode}]`;
+                        errorDetails = `錯誤信息：${result.error}\n\n`;
+                        if (result.errorDetails) {
+                            errorDetails += `詳細信息：${result.errorDetails}\n\n`;
+                        }
+                        errorDetails += '請檢查：\n1. 網絡連接\n2. 是否已登入\n3. 數據庫權限設置\n4. 瀏覽器控制台（F12）的詳細錯誤';
                     } else if (result.error) {
                         errorMessage = '同步失敗';
-                        errorDetails = `錯誤信息：${result.error}\n\n請檢查：\n1. 網絡連接\n2. 是否已登入\n3. 瀏覽器控制台是否有更多錯誤信息`;
+                        errorDetails = `錯誤信息：${result.error}\n\n請檢查：\n1. 網絡連接\n2. 是否已登入\n3. 瀏覽器控制台（F12）是否有更多錯誤信息`;
                     } else {
                         errorMessage = '同步失敗（未知錯誤）';
                         errorDetails = '請打開瀏覽器控制台（F12）查看詳細錯誤信息';
