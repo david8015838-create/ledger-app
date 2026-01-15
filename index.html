@@ -1776,10 +1776,30 @@
         
         if (SUPABASE_CONFIG.url !== 'YOUR_SUPABASE_URL' && SUPABASE_CONFIG.anonKey !== 'YOUR_SUPABASE_ANON_KEY') {
             try {
-                supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
-                console.log('✅ Supabase initialized');
+                // 檢查 Supabase 是否已加載
+                if (typeof supabase === 'undefined' && typeof window.supabase === 'undefined') {
+                    console.error('❌ Supabase library not loaded. Please check the script tag.');
+                    throw new Error('Supabase library not loaded');
+                }
+                
+                // 嘗試不同的加載方式（CDN 可能使用 supabase 或 window.supabase）
+                const supabaseLib = supabase || window.supabase;
+                if (!supabaseLib || !supabaseLib.createClient) {
+                    console.error('❌ Supabase.createClient is not available');
+                    throw new Error('Supabase.createClient is not available');
+                }
+                
+                supabaseClient = supabaseLib.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+                console.log('✅ Supabase initialized successfully');
+                console.log('📊 Supabase URL:', SUPABASE_CONFIG.url);
             } catch (error) {
-                console.warn('⚠️ Supabase initialization failed:', error);
+                console.error('❌ Supabase initialization failed:', error);
+                console.error('❌ Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    supabaseAvailable: typeof supabase !== 'undefined',
+                    windowSupabaseAvailable: typeof window.supabase !== 'undefined'
+                });
             }
         } else {
             console.warn('⚠️ Supabase not configured. Running in local-only mode.');
@@ -3026,12 +3046,31 @@
                 
                 // 檢查 Supabase 客戶端是否正確初始化
                 if (!supabaseClient) {
-                    throw new Error('Supabase 客戶端未初始化，請檢查配置');
+                    console.error('❌ Supabase client check failed:', {
+                        supabaseClient: supabaseClient,
+                        supabaseConfig: SUPABASE_CONFIG,
+                        supabaseLibAvailable: typeof supabase !== 'undefined' || typeof window.supabase !== 'undefined'
+                    });
+                    throw new Error('Supabase 客戶端未初始化，請檢查配置和網絡連接');
                 }
                 
                 // 檢查用戶是否已登入
                 if (!currentUser || !state.isLoggedIn) {
+                    console.error('❌ User check failed:', {
+                        currentUser: currentUser,
+                        isLoggedIn: state.isLoggedIn,
+                        userId: state.userId
+                    });
                     throw new Error('用戶未登入，請先登入帳戶');
+                }
+                
+                // 驗證 Supabase 客戶端是否可用
+                try {
+                    const testSession = await supabaseClient.auth.getSession();
+                    console.log('✅ Supabase client is accessible');
+                } catch (testError) {
+                    console.error('❌ Supabase client test failed:', testError);
+                    throw new Error(`Supabase 客戶端無法訪問: ${testError.message}`);
                 }
                 
                 // syncToCloud() 會處理所有同步邏輯，包括雙向合併
