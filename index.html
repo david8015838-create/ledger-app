@@ -1972,13 +1972,23 @@
                     console.log('📥 Step A: Fetching cloud and local data...');
                     
                     // 获取云端数据（包括已删除的）
+                    console.log('📡 Fetching cloud transactions for user:', currentUser.id);
                     const { data: cloudTransactions, error: fetchCloudError } = await this.supabaseClient
                         .from('transactions')
                         .select('*')
                         .eq('user_id', currentUser.id)
                         .gte('date', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
                     
-                    if (fetchCloudError) throw fetchCloudError;
+                    if (fetchCloudError) {
+                        console.error('❌ Fetch cloud error:', fetchCloudError);
+                        console.error('❌ Error code:', fetchCloudError.code);
+                        console.error('❌ Error message:', fetchCloudError.message);
+                        console.error('❌ Error details:', fetchCloudError.details);
+                        console.error('❌ Error hint:', fetchCloudError.hint);
+                        throw fetchCloudError;
+                    }
+                    
+                    console.log(`✅ Fetched ${cloudTransactions?.length || 0} cloud transactions`);
                     
                     // 获取本地数据（包括已删除的）
                     const localTransactions = await this.localDB.getAll('transactions');
@@ -2026,12 +2036,17 @@
                             is_deleted: tx.is_deleted || false
                         }));
 
+                        console.log(`📤 Uploading ${txData.length} transactions to cloud...`);
                         const { error: txError } = await this.supabaseClient
                             .from('transactions')
                             .upsert(txData, { onConflict: 'id' });
 
                         if (txError) {
                             console.error('❌ Failed to upload transactions to cloud:', txError);
+                            console.error('❌ Error code:', txError.code);
+                            console.error('❌ Error message:', txError.message);
+                            console.error('❌ Error details:', txError.details);
+                            console.error('❌ Error hint:', txError.hint);
                             throw txError;
                         }
                         console.log(`✅ Uploaded ${mergedTransactions.length} merged transactions to cloud`);
@@ -3003,14 +3018,29 @@
                     hasCurrentUser: !!currentUser,
                     isLoggedIn: state.isLoggedIn,
                     userId: currentUser?.id,
-                    isSyncing: syncManager?.isSyncing
+                    userEmail: currentUser?.email,
+                    isSyncing: syncManager?.isSyncing,
+                    supabaseUrl: supabaseClient ? SUPABASE_CONFIG.url : 'not configured',
+                    currentUrl: window.location.href
                 });
+                
+                // 檢查 Supabase 客戶端是否正確初始化
+                if (!supabaseClient) {
+                    throw new Error('Supabase 客戶端未初始化，請檢查配置');
+                }
+                
+                // 檢查用戶是否已登入
+                if (!currentUser || !state.isLoggedIn) {
+                    throw new Error('用戶未登入，請先登入帳戶');
+                }
                 
                 // syncToCloud() 會處理所有同步邏輯，包括雙向合併
                 // 如果同步失敗，本地數據不會被修改，所以不需要撤銷
+                console.log('📤 Calling syncToCloud()...');
                 const result = await syncManager.syncToCloud();
                 
                 console.log('📊 Sync result:', result);
+                console.log('📊 Sync result details:', JSON.stringify(result, null, 2));
 
                 if (result.success) {
                     console.log('✅ Bidirectional merge sync completed');
