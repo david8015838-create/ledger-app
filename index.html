@@ -2082,63 +2082,106 @@
                                     .upsert(txData, { onConflict: 'id' });
                                 
                                 if (!error) {
-                                    // 成功！如果這是第一次嘗試（只有基礎欄位），嘗試添加可選欄位
-                                    if (uploadAttempt === 0 && optionalFields.length > 0) {
-                                        console.log('✅ Basic upload successful, trying to add optional fields...');
-                                        // 嘗試添加可選欄位
-                                        const txDataWithOptional = mergedTransactions.map(tx => {
-                                            const data = {
-                                                id: tx.id,
-                                                user_id: currentUser.id,
-                                                amount: tx.amount,
-                                                date: tx.date,
-                                                note: tx.note || '',
-                                                category: tx.category,
-                                                icon: tx.icon,
-                                                currency: tx.currency || 'TWD',
-                                                updated_at: tx.updated_at,
-                                                is_deleted: tx.is_deleted || false
-                                            };
+                                    // 基礎欄位上傳成功！
+                                    console.log('✅ Basic fields uploaded successfully');
+                                    
+                                    // 如果這是第一次嘗試（只有基礎欄位），嘗試逐步添加可選欄位
+                                    if (uploadAttempt === 0) {
+                                        // 先嘗試添加 payment_method 和 card_id（這些欄位通常存在）
+                                        try {
+                                            const txDataWithPayment = mergedTransactions.map(tx => {
+                                                const data = {
+                                                    id: tx.id,
+                                                    user_id: currentUser.id,
+                                                    amount: tx.amount,
+                                                    date: tx.date,
+                                                    note: tx.note || '',
+                                                    category: tx.category,
+                                                    icon: tx.icon,
+                                                    currency: tx.currency || 'TWD',
+                                                    updated_at: tx.updated_at,
+                                                    is_deleted: tx.is_deleted || false
+                                                };
+                                                
+                                                const paymentMethod = tx.paymentMethod || tx.payment_method;
+                                                if (paymentMethod && paymentMethod !== 'cash') {
+                                                    data.payment_method = paymentMethod;
+                                                }
+                                                
+                                                const cardId = tx.cardId || tx.card_id;
+                                                if (cardId) {
+                                                    data.card_id = cardId;
+                                                }
+                                                
+                                                return data;
+                                            });
                                             
-                                            // 嘗試添加可選欄位
-                                            const paymentMethod = tx.paymentMethod || tx.payment_method;
-                                            if (paymentMethod && paymentMethod !== 'cash') {
-                                                data.payment_method = paymentMethod;
+                                            const { error: paymentError } = await this.supabaseClient
+                                                .from('transactions')
+                                                .upsert(txDataWithPayment, { onConflict: 'id' });
+                                            
+                                            if (!paymentError) {
+                                                console.log('✅ Payment fields added successfully');
+                                                
+                                                // 再嘗試添加其他可選欄位（但不包括 billing_month）
+                                                try {
+                                                    const txDataWithMore = mergedTransactions.map(tx => {
+                                                        const data = {
+                                                            id: tx.id,
+                                                            user_id: currentUser.id,
+                                                            amount: tx.amount,
+                                                            date: tx.date,
+                                                            note: tx.note || '',
+                                                            category: tx.category,
+                                                            icon: tx.icon,
+                                                            currency: tx.currency || 'TWD',
+                                                            updated_at: tx.updated_at,
+                                                            is_deleted: tx.is_deleted || false
+                                                        };
+                                                        
+                                                        const paymentMethod = tx.paymentMethod || tx.payment_method;
+                                                        if (paymentMethod && paymentMethod !== 'cash') {
+                                                            data.payment_method = paymentMethod;
+                                                        }
+                                                        
+                                                        const cardId = tx.cardId || tx.card_id;
+                                                        if (cardId) {
+                                                            data.card_id = cardId;
+                                                        }
+                                                        
+                                                        const installments = tx.installments;
+                                                        if (installments && installments > 1) {
+                                                            data.installments = installments;
+                                                        }
+                                                        
+                                                        const interestRate = tx.interestRate || tx.interest_rate;
+                                                        if (interestRate && interestRate > 0) {
+                                                            data.interest_rate = interestRate;
+                                                        }
+                                                        
+                                                        // 注意：這裡故意不包含 billing_month
+                                                        // 因為這個欄位可能不存在於某些數據庫中
+                                                        
+                                                        return data;
+                                                    });
+                                                    
+                                                    const { error: moreError } = await this.supabaseClient
+                                                        .from('transactions')
+                                                        .upsert(txDataWithMore, { onConflict: 'id' });
+                                                    
+                                                    if (!moreError) {
+                                                        console.log('✅ Additional optional fields added successfully');
+                                                    } else {
+                                                        console.warn('⚠️ Some optional fields not supported, but sync succeeded');
+                                                    }
+                                                } catch (moreErr) {
+                                                    console.warn('⚠️ Error adding additional fields (non-critical):', moreErr.message);
+                                                }
+                                            } else {
+                                                console.warn('⚠️ Payment fields not supported, but basic sync succeeded');
                                             }
-                                            
-                                            const cardId = tx.cardId || tx.card_id;
-                                            if (cardId) {
-                                                data.card_id = cardId;
-                                            }
-                                            
-                                            const installments = tx.installments;
-                                            if (installments && installments > 1) {
-                                                data.installments = installments;
-                                            }
-                                            
-                                            const interestRate = tx.interestRate || tx.interest_rate;
-                                            if (interestRate && interestRate > 0) {
-                                                data.interest_rate = interestRate;
-                                            }
-                                            
-                                            const billingMonth = tx.billingMonth || tx.billing_month;
-                                            if (billingMonth) {
-                                                data.billing_month = billingMonth;
-                                            }
-                                            
-                                            return data;
-                                        });
-                                        
-                                        // 嘗試上傳包含可選欄位的數據
-                                        const { error: optionalError } = await this.supabaseClient
-                                            .from('transactions')
-                                            .upsert(txDataWithOptional, { onConflict: 'id' });
-                                        
-                                        if (!optionalError) {
-                                            console.log('✅ Successfully uploaded with optional fields');
-                                        } else {
-                                            console.warn('⚠️ Optional fields not supported, but basic sync succeeded');
-                                            console.warn('⚠️ Optional fields error:', optionalError.message);
+                                        } catch (paymentErr) {
+                                            console.warn('⚠️ Error adding payment fields (non-critical):', paymentErr.message);
                                         }
                                     }
                                     // 成功，跳出循環
