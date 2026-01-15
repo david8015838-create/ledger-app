@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>检查 Supabase 数据</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 1000px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #4ade80;
+            margin-bottom: 20px;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        .section h2 {
+            color: #60a5fa;
+            margin-bottom: 15px;
+        }
+        .button {
+            background: #4ade80;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: all 0.2s;
+        }
+        .button:hover {
+            background: #22c55e;
+            transform: translateY(-2px);
+        }
+        .button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .result-box {
+            background: #0a0a0a;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            border: 1px solid #333;
+            white-space: pre-wrap;
+            color: #a0a0a0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            color: #4ade80;
+        }
+        .error {
+            color: #f87171;
+        }
+        .warning {
+            color: #fbbf24;
+        }
+        .info {
+            color: #60a5fa;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+            font-size: 13px;
+        }
+        th {
+            background: #1a1a1a;
+            color: #4ade80;
+            font-weight: bold;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .status-success {
+            background: #22c55e20;
+            color: #4ade80;
+        }
+        .status-error {
+            background: #ef444420;
+            color: #f87171;
+        }
+        .status-empty {
+            background: #fbbf2420;
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 检查 Supabase 数据</h1>
+        <p>检查云端数据库中的预算、信用卡和其他设置数据</p>
+        
+        <div class="section">
+            <h2>1. 登录状态</h2>
+            <button class="button" onclick="checkAuth()">检查登录状态</button>
+            <div id="authResult" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div class="section">
+            <h2>2. 用户设置（预算、主题等）</h2>
+            <button class="button" onclick="checkSettings()">检查用户设置</button>
+            <div id="settingsResult" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div class="section">
+            <h2>3. 信用卡数据</h2>
+            <button class="button" onclick="checkCreditCards()">检查信用卡</button>
+            <div id="cardsResult" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div class="section">
+            <h2>4. 检查所有数据</h2>
+            <button class="button" onclick="checkAll()">检查所有数据</button>
+        </div>
+
+        <div class="section">
+            <h2>5. 测试上传数据</h2>
+            <button class="button" onclick="testUpload()">测试上传预算和信用卡</button>
+            <div id="uploadResult" class="result-box" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://ndtkurowumazsgdotlxb.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kdGt1cm93dW1henNnZG90bHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMzUwMzUsImV4cCI6MjA4MzgxMTAzNX0.tukEU-T8f8Sne7KRFOPBYgtlhalHWaPMJlZ_Qpa6J6E';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let currentUser = null;
+
+        async function checkAuth() {
+            const resultDiv = document.getElementById('authResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<span class="info">正在检查登录状态...</span>';
+
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                
+                if (error) {
+                    resultDiv.innerHTML = `<span class="error">❌ 错误: ${error.message}</span>`;
+                    return;
+                }
+
+                if (!session || !session.user) {
+                    resultDiv.innerHTML = '<span class="warning">⚠️ 未登录</span>\n\n请先登录才能检查数据。';
+                    return;
+                }
+
+                currentUser = session.user;
+                resultDiv.innerHTML = `<span class="success">✅ 已登录</span>\n\n用户ID: ${currentUser.id}\n邮箱: ${currentUser.email || 'N/A'}`;
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">❌ 检查失败: ${error.message}</span>`;
+            }
+        }
+
+        async function checkSettings() {
+            if (!currentUser) {
+                alert('请先检查登录状态');
+                return;
+            }
+
+            const resultDiv = document.getElementById('settingsResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<span class="info">正在查询用户设置...</span>';
+
+            try {
+                const { data: settings, error } = await supabase
+                    .from('user_settings')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .single();
+
+                if (error) {
+                    if (error.code === 'PGRST116') {
+                        resultDiv.innerHTML = '<span class="status-empty">⚠️ 用户设置不存在</span>\n\n云端还没有用户设置数据。\n请先同步数据。';
+                    } else {
+                        resultDiv.innerHTML = `<span class="error">❌ 查询失败: ${error.message}</span>`;
+                    }
+                    return;
+                }
+
+                if (!settings) {
+                    resultDiv.innerHTML = '<span class="status-empty">⚠️ 用户设置为空</span>';
+                    return;
+                }
+
+                let html = '<span class="success">✅ 找到用户设置</span>\n\n';
+                html += '<table>';
+                html += '<tr><th>字段</th><th>值</th></tr>';
+                html += `<tr><td>预算 (budget)</td><td class="success">${settings.budget || 'N/A'}</td></tr>`;
+                html += `<tr><td>主题 (theme_id)</td><td>${settings.theme_id || 'N/A'}</td></tr>`;
+                html += `<tr><td>货币 (currency)</td><td>${settings.currency || 'N/A'}</td></tr>`;
+                html += `<tr><td>自定义主题 (custom_theme)</td><td>${settings.custom_theme ? JSON.stringify(settings.custom_theme) : 'null'}</td></tr>`;
+                html += `<tr><td>更新时间 (updated_at)</td><td>${settings.updated_at || 'N/A'}</td></tr>`;
+                html += `<tr><td>最后同步 (last_sync_at)</td><td>${settings.last_sync_at || 'N/A'}</td></tr>`;
+                html += '</table>';
+
+                resultDiv.innerHTML = html;
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">❌ 检查失败: ${error.message}</span>`;
+            }
+        }
+
+        async function checkCreditCards() {
+            if (!currentUser) {
+                alert('请先检查登录状态');
+                return;
+            }
+
+            const resultDiv = document.getElementById('cardsResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<span class="info">正在查询信用卡数据...</span>';
+
+            try {
+                const { data: cards, error } = await supabase
+                    .from('credit_cards')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .eq('is_deleted', false);
+
+                if (error) {
+                    resultDiv.innerHTML = `<span class="error">❌ 查询失败: ${error.message}</span>`;
+                    return;
+                }
+
+                if (!cards || cards.length === 0) {
+                    resultDiv.innerHTML = '<span class="status-empty">⚠️ 没有找到信用卡数据</span>\n\n云端还没有信用卡数据。\n请先添加信用卡并同步。';
+                    return;
+                }
+
+                let html = `<span class="success">✅ 找到 ${cards.length} 张信用卡</span>\n\n`;
+                html += '<table>';
+                html += '<tr><th>ID</th><th>名称</th><th>结账日</th><th>缴款间隔</th><th>初始余额</th><th>结转余额</th></tr>';
+                cards.forEach(card => {
+                    html += `<tr>`;
+                    html += `<td>${card.id}</td>`;
+                    html += `<td>${card.name}</td>`;
+                    html += `<td>${card.closing_day}</td>`;
+                    html += `<td>${card.due_days_after}</td>`;
+                    html += `<td>${card.initial_balance || 0}</td>`;
+                    html += `<td>${card.carrying_balance || 0}</td>`;
+                    html += `</tr>`;
+                });
+                html += '</table>';
+
+                resultDiv.innerHTML = html;
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">❌ 检查失败: ${error.message}</span>`;
+            }
+        }
+
+        async function checkAll() {
+            await checkAuth();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            if (currentUser) {
+                await checkSettings();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await checkCreditCards();
+            }
+        }
+
+        async function testUpload() {
+            if (!currentUser) {
+                alert('请先检查登录状态');
+                return;
+            }
+
+            const resultDiv = document.getElementById('uploadResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<span class="info">正在测试上传数据...</span>';
+
+            try {
+                // 测试上传预算
+                const now = new Date().toISOString();
+                const testBudget = 50000; // 测试预算值
+                
+                const { data: settingsData, error: settingsError } = await supabase
+                    .from('user_settings')
+                    .upsert({
+                        user_id: currentUser.id,
+                        budget: testBudget,
+                        theme_id: 'minimal',
+                        currency: 'TWD',
+                        updated_at: now,
+                        last_sync_at: now
+                    }, { onConflict: 'user_id' });
+
+                if (settingsError) {
+                    resultDiv.innerHTML = `<span class="error">❌ 上传预算失败: ${settingsError.message}</span>`;
+                    return;
+                }
+
+                // 测试上传信用卡
+                const testCard = {
+                    id: 'test-card-' + Date.now(),
+                    user_id: currentUser.id,
+                    name: '测试信用卡',
+                    closing_day: 15,
+                    due_days_after: 7,
+                    carrying_balance: 0,
+                    initial_balance: 0,
+                    updated_at: now,
+                    is_deleted: false
+                };
+
+                const { error: cardError } = await supabase
+                    .from('credit_cards')
+                    .upsert(testCard, { onConflict: 'id' });
+
+                if (cardError) {
+                    resultDiv.innerHTML = `<span class="error">❌ 上传信用卡失败: ${cardError.message}</span>\n\n但预算上传成功！`;
+                    return;
+                }
+
+                resultDiv.innerHTML = `<span class="success">✅ 测试上传成功！</span>\n\n已上传：\n- 预算: ${testBudget}\n- 测试信用卡: ${testCard.name}\n\n请点击"检查所有数据"查看结果。`;
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">❌ 测试失败: ${error.message}</span>`;
+            }
+        }
+
+        // 页面加载时自动检查登录状态
+        window.addEventListener('load', () => {
+            setTimeout(checkAuth, 500);
+        });
+    </script>
+</body>
+</html>

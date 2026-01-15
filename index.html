@@ -2319,6 +2319,13 @@
                         const customThemeSetting = await this.localDB.get('settings', 'customTheme');
                         const settingsUpdatedAt = await this.localDB.get('settings', 'settings_updated_at');
 
+                        console.log(`📊 Settings from IndexedDB:`, {
+                            budget: budgetSetting ? budgetSetting.value : 'not found',
+                            themeId: themeSetting ? themeSetting.value : 'not found',
+                            currency: currencySetting ? currencySetting.value : 'not found',
+                            customTheme: customThemeSetting ? 'exists' : 'not found'
+                        });
+
                         const now = new Date().toISOString();
                         const settingsData = {
                             user_id: currentUser.id,
@@ -2330,21 +2337,28 @@
                             last_sync_at: now
                         };
 
+                        console.log(`📤 Uploading settings to cloud:`, settingsData);
+
                         const { error: settingsError } = await this.supabaseClient
                             .from('user_settings')
                             .upsert(settingsData, { onConflict: 'user_id' });
 
                         if (settingsError) {
                             console.warn('⚠️ Failed to sync user settings:', settingsError);
+                            console.warn('⚠️ Settings error details:', JSON.stringify(settingsError, null, 2));
                         } else {
-                            console.log('✅ Synced user settings (including custom theme)');
+                            console.log('✅ Synced user settings successfully (including custom theme and budget)');
                         }
                     } catch (settingsSyncError) {
                         console.warn('⚠️ Settings sync failed, but continuing:', settingsSyncError);
+                        console.warn('⚠️ Settings sync error details:', JSON.stringify(settingsSyncError, null, 2));
                     }
 
                     // 3.5. 同步信用卡数据（即使失敗也不影響整體同步成功）
                     try {
+                        console.log(`📊 Checking credit cards: state.cards =`, state.cards);
+                        console.log(`📊 Credit cards length: ${state.cards ? state.cards.length : 'null'}`);
+                        
                         if (state.cards && state.cards.length > 0) {
                             const now = new Date().toISOString();
                             const cardData = state.cards.map(card => ({
@@ -2359,18 +2373,24 @@
                                 is_deleted: card.is_deleted || false
                             }));
 
+                            console.log(`📤 Uploading ${cardData.length} credit cards to cloud:`, cardData);
+
                             const { error: cardError } = await this.supabaseClient
                                 .from('credit_cards')
                                 .upsert(cardData, { onConflict: 'id' });
 
                             if (cardError) {
                                 console.warn('⚠️ Failed to sync credit cards:', cardError);
+                                console.warn('⚠️ Card error details:', JSON.stringify(cardError, null, 2));
                             } else {
-                                console.log(`✅ Synced ${state.cards.length} credit cards`);
+                                console.log(`✅ Synced ${state.cards.length} credit cards successfully`);
                             }
+                        } else {
+                            console.log('ℹ️ No credit cards to sync (state.cards is empty or null)');
                         }
                     } catch (cardSyncError) {
                         console.warn('⚠️ Credit card sync failed, but continuing:', cardSyncError);
+                        console.warn('⚠️ Card sync error details:', JSON.stringify(cardSyncError, null, 2));
                     }
 
                     // 4. 執行雲端資料清理（刪除 365 天前的資料）
@@ -3279,6 +3299,23 @@
                 } catch (testError) {
                     console.error('❌ Supabase client test failed:', testError);
                     throw new Error(`Supabase 客戶端無法訪問: ${testError.message}`);
+                }
+                
+                // 确保数据已加载（特别是信用卡和预算）
+                console.log('📊 Pre-sync data check:', {
+                    budget: state.budget,
+                    cardsCount: state.cards ? state.cards.length : 0,
+                    cards: state.cards
+                });
+                
+                // 如果数据未加载，先加载
+                if (!state.budget || (state.cards === undefined || state.cards === null)) {
+                    console.log('📂 Data not loaded, loading from local storage...');
+                    await loadDataFromLocal();
+                    console.log('📊 After load data:', {
+                        budget: state.budget,
+                        cardsCount: state.cards ? state.cards.length : 0
+                    });
                 }
                 
                 // syncToCloud() 會處理所有同步邏輯，包括雙向合併
