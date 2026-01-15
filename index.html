@@ -2051,8 +2051,10 @@
                         // 構建交易數據，使用最基礎的欄位（確保所有數據庫結構都支持）
                         const txData = mergedTransactions.map(tx => {
                             // 基礎欄位（所有數據庫都應該有）
+                            // 確保 ID 是整數（BIGINT），避免小數導致錯誤
+                            const txId = typeof tx.id === 'number' ? Math.floor(tx.id) : parseInt(tx.id, 10);
                             const data = {
-                                id: tx.id,
+                                id: txId,
                                 user_id: currentUser.id,
                                 amount: tx.amount,
                                 date: tx.date,
@@ -2090,8 +2092,10 @@
                                         // 先嘗試添加 payment_method 和 card_id（這些欄位通常存在）
                                         try {
                                             const txDataWithPayment = mergedTransactions.map(tx => {
+                                                // 确保 ID 是整数
+                                                const txId = typeof tx.id === 'number' ? Math.floor(tx.id) : parseInt(tx.id, 10);
                                                 const data = {
-                                                    id: tx.id,
+                                                    id: txId,
                                                     user_id: currentUser.id,
                                                     amount: tx.amount,
                                                     date: tx.date,
@@ -2126,8 +2130,10 @@
                                                 // 再嘗試添加其他可選欄位（但不包括 billing_month）
                                                 try {
                                                     const txDataWithMore = mergedTransactions.map(tx => {
+                                                        // 确保 ID 是整数
+                                                        const txId = typeof tx.id === 'number' ? Math.floor(tx.id) : parseInt(tx.id, 10);
                                                         const data = {
-                                                            id: tx.id,
+                                                            id: txId,
                                                             user_id: currentUser.id,
                                                             amount: tx.amount,
                                                             date: tx.date,
@@ -2231,9 +2237,11 @@
                         const batchSize = 100;
                         for (let i = 0; i < mergedTransactions.length; i += batchSize) {
                             const batch = mergedTransactions.slice(i, i + batchSize);
-                            await Promise.all(batch.map(tx => 
-                                this.localDB.put('transactions', {
-                                    id: tx.id,
+                            await Promise.all(batch.map(tx => {
+                                // 确保 ID 是整数（BIGINT）
+                                const txId = typeof tx.id === 'number' ? Math.floor(tx.id) : parseInt(tx.id, 10);
+                                return this.localDB.put('transactions', {
+                                    id: txId,
                                     amount: parseFloat(tx.amount),
                                     date: tx.date,
                                     note: tx.note || '',
@@ -2574,8 +2582,10 @@
                     // 保存合并后的数据到本地（包括已删除的记录和信用卡字段）
                     let savedCount = 0;
                     for (const tx of mergedTransactions) {
+                        // 确保 ID 是整数（BIGINT）
+                        const txId = typeof tx.id === 'number' ? Math.floor(tx.id) : parseInt(tx.id, 10);
                         await this.localDB.put('transactions', {
-                            id: tx.id,
+                            id: txId,
                             amount: parseFloat(tx.amount),
                             date: tx.date,
                             note: tx.note || '',
@@ -2926,7 +2936,7 @@
                 // 建立交易
                 const category = state.categories.find(c => c.name === recurring.category) || state.categories[0];
                 const transaction = {
-                    id: Date.now() + Math.random(),
+                    id: Math.floor(Date.now() + Math.random() * 1000), // 确保 ID 是整数（BIGINT）
                     amount: recurring.amount,
                     note: recurring.note || `${recurring.category} (定期)`,
                     date: todayStr,
@@ -5518,7 +5528,7 @@
             }
             
             const data = { 
-                id: state.editingId || Date.now(), 
+                id: state.editingId ? (typeof state.editingId === 'number' ? Math.floor(state.editingId) : parseInt(state.editingId, 10)) : Math.floor(Date.now()), 
                 amount: amt, 
                 currency: state.tempCurrency || state.currency,
                 date: date, 
