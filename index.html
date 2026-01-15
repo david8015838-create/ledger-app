@@ -4142,8 +4142,6 @@
         }
 
         async function handleSignOut() {
-            if (!supabaseClient) return;
-            
             // 二次确认
             const confirmed = confirm('確定要登出嗎？\n\n登出後將無法同步資料到雲端，但本地資料會保留。');
             if (!confirmed) {
@@ -4152,20 +4150,41 @@
             }
             
             try {
-                const { error } = await supabaseClient.auth.signOut();
-                if (error) throw error;
+                // 尝试从 Supabase 登出（如果有有效的 session）
+                if (supabaseClient) {
+                    const { data: { session } } = await supabaseClient.auth.getSession();
+                    if (session) {
+                        const { error } = await supabaseClient.auth.signOut();
+                        if (error) {
+                            console.warn('⚠️ Sign out error (but continuing to clear local state):', error);
+                            // 即使云端登出失败，也继续清除本地状态
+                        } else {
+                            console.log('✅ Signed out from cloud successfully');
+                        }
+                    } else {
+                        console.log('ℹ️ No active session, clearing local state only');
+                    }
+                }
                 
-                console.log('✅ Signed out successfully');
+                // 无论云端登出是否成功，都清除本地状态
+                console.log('✅ Clearing local auth state');
                 state.isLoggedIn = false;
                 state.userId = null;
                 currentUser = null;
                 
                 // Show auth page
                 showAuthPage();
+                updateAuthUI();
                 
             } catch (error) {
                 console.error('❌ Sign out error:', error);
-                alert('登出失敗：' + error.message);
+                // 即使出错，也清除本地状态
+                state.isLoggedIn = false;
+                state.userId = null;
+                currentUser = null;
+                showAuthPage();
+                updateAuthUI();
+                // 不显示错误提示，因为本地状态已经清除
             }
         }
 
