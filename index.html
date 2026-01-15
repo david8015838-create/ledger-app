@@ -2316,6 +2316,7 @@
                         const budgetSetting = await this.localDB.get('settings', 'budget');
                         const themeSetting = await this.localDB.get('settings', 'themeId');
                         const currencySetting = await this.localDB.get('settings', 'currency');
+                        const customThemeSetting = await this.localDB.get('settings', 'customTheme');
                         const settingsUpdatedAt = await this.localDB.get('settings', 'settings_updated_at');
 
                         const now = new Date().toISOString();
@@ -2324,6 +2325,7 @@
                             budget: budgetSetting ? budgetSetting.value : 30000,
                             theme_id: themeSetting ? themeSetting.value : 'minimal',
                             currency: currencySetting ? currencySetting.value : 'TWD',
+                            custom_theme: customThemeSetting ? customThemeSetting.value : null,
                             updated_at: settingsUpdatedAt ? settingsUpdatedAt.value : now,
                             last_sync_at: now
                         };
@@ -2335,7 +2337,7 @@
                         if (settingsError) {
                             console.warn('⚠️ Failed to sync user settings:', settingsError);
                         } else {
-                            console.log('✅ Synced user settings');
+                            console.log('✅ Synced user settings (including custom theme)');
                         }
                     } catch (settingsSyncError) {
                         console.warn('⚠️ Settings sync failed, but continuing:', settingsSyncError);
@@ -2600,6 +2602,10 @@
                         // 保存到 localStorage
                         localStorage.setItem('ledger_cards_v13', JSON.stringify(state.cards));
                         console.log(`✅ Pulled ${creditCards.length} credit cards from cloud`);
+                    } else if (creditCards && creditCards.length === 0) {
+                        // 如果云端没有信用卡数据，清空本地（但保留本地如果有的话，使用双向合并逻辑）
+                        // 这里不强制清空，因为可能本地有未同步的数据
+                        console.log('ℹ️ No credit cards in cloud');
                     }
 
                     if (settings) {
@@ -2613,6 +2619,26 @@
                             await this.localDB.put('settings', { key: 'budget', value: parseFloat(settings.budget) });
                             await this.localDB.put('settings', { key: 'themeId', value: settings.theme_id });
                             await this.localDB.put('settings', { key: 'currency', value: settings.currency });
+                            
+                            // 同步自定义主题色
+                            if (settings.custom_theme) {
+                                await this.localDB.put('settings', { key: 'customTheme', value: settings.custom_theme });
+                                state.customTheme = settings.custom_theme;
+                                // 应用自定义主题
+                                document.documentElement.style.setProperty('--accent', state.customTheme.color);
+                                document.documentElement.style.setProperty('--accent-rgb', state.customTheme.rgb);
+                                document.documentElement.style.setProperty('--bg-deep', state.customTheme.bg);
+                                document.documentElement.style.setProperty('--card-bg', `rgba(28, 28, 32, ${state.customTheme.opacity})`);
+                            } else {
+                                // 如果云端没有自定义主题，清除本地自定义主题
+                                await this.localDB.delete('settings', 'customTheme');
+                                state.customTheme = null;
+                                // 应用默认主题
+                                if (typeof applyTheme === 'function') {
+                                    applyTheme(state.themeId);
+                                }
+                            }
+                            
                             await this.localDB.put('settings', { key: 'settings_updated_at', value: cloudUpdatedAt });
                             
                             // 更新 state
@@ -2620,7 +2646,7 @@
                             state.themeId = settings.theme_id;
                             state.currency = settings.currency;
                             
-                            console.log('✅ Pulled user settings from cloud (updated)');
+                            console.log('✅ Pulled user settings from cloud (updated, including custom theme)');
                         } else {
                             console.log('✅ Local settings are newer, keeping local version');
                         }
@@ -3271,6 +3297,7 @@
                     const budgetSetting = await localDB.get('settings', 'budget');
                     const themeSetting = await localDB.get('settings', 'themeId');
                     const currencySetting = await localDB.get('settings', 'currency');
+                    const customThemeSetting = await localDB.get('settings', 'customTheme');
                     const settingsUpdatedAt = await localDB.get('settings', 'settings_updated_at');
 
                     const now = new Date().toISOString();
@@ -3279,6 +3306,7 @@
                         budget: budgetSetting ? budgetSetting.value : 30000,
                         theme_id: themeSetting ? themeSetting.value : 'minimal',
                         currency: currencySetting ? currencySetting.value : 'TWD',
+                        custom_theme: customThemeSetting ? customThemeSetting.value : null,
                         updated_at: settingsUpdatedAt ? settingsUpdatedAt.value : now,
                         last_sync_at: now
                     };
@@ -3291,7 +3319,7 @@
                         console.warn('⚠️ Failed to sync settings:', settingsError);
                         // 設置同步失敗不影響整體同步成功
                     } else {
-                        console.log('✅ Synced user settings');
+                        console.log('✅ Synced user settings (including custom theme)');
                     }
                     
                     // 记录最后同步时间
