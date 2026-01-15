@@ -2005,7 +2005,8 @@
                     // 步骤 C：更新云端和本地
                     console.log('💾 Step C: Writing merged data...');
                     
-                    // 更新云端：上传完整的合并数据（包括已删除的和信用卡字段）
+                    // 先更新云端：上传完整的合并数据（包括已删除的和信用卡字段）
+                    // 只有在云端更新成功后才更新本地，避免数据不一致
                     if (mergedTransactions.length > 0) {
                         const txData = mergedTransactions.map(tx => ({
                             id: tx.id,
@@ -2029,13 +2030,14 @@
                             .from('transactions')
                             .upsert(txData, { onConflict: 'id' });
 
-                        if (txError) throw txError;
+                        if (txError) {
+                            console.error('❌ Failed to upload transactions to cloud:', txError);
+                            throw txError;
+                        }
                         console.log(`✅ Uploaded ${mergedTransactions.length} merged transactions to cloud`);
-                    }
-                    
-                    // 更新本地：保存完整的合并数据（包括已删除的和信用卡字段，用于同步）
-                    // 批量处理，避免循环过慢
-                    if (mergedTransactions.length > 0) {
+                        
+                        // 云端更新成功后才更新本地：保存完整的合并数据（包括已删除的和信用卡字段，用于同步）
+                        // 批量处理，避免循环过慢
                         const batchSize = 100;
                         for (let i = 0; i < mergedTransactions.length; i += batchSize) {
                             const batch = mergedTransactions.slice(i, i + batchSize);
@@ -2062,99 +2064,121 @@
                         console.log(`✅ Saved ${mergedTransactions.length} merged transactions to local`);
                     }
 
-                    // 2. 同步分类
-                    const categories = await this.localDB.getAll('categories');
-                    const localCatIds = new Set();
-                    
-                    if (categories.length > 0) {
-                        const catData = categories.map(cat => {
-                            const catId = cat.id || crypto.randomUUID();
-                            localCatIds.add(catId);
-                            return {
-                                id: catId,
-                                user_id: currentUser.id,
-                                name: cat.name,
-                                icon: cat.icon,
-                                color: cat.color,
-                                updated_at: cat.updated_at || new Date().toISOString()
-                            };
-                        });
-
-                        const { error: catError } = await this.supabaseClient
-                            .from('categories')
-                            .upsert(catData, { onConflict: 'id' });
-
-                        if (catError) throw catError;
-                        console.log(`✅ Synced ${categories.length} categories`);
-                    }
-                    
-                    // 2.1 删除云端中本地不存在的分类（实现真正的删除同步）
-                    const { data: cloudCategories, error: fetchCatError } = await this.supabaseClient
-                        .from('categories')
-                        .select('id')
-                        .eq('user_id', currentUser.id);
-                    
-                    if (!fetchCatError && cloudCategories) {
-                        const cloudCatIds = new Set(cloudCategories.map(cat => cat.id));
-                        const toDelete = Array.from(cloudCatIds).filter(id => !localCatIds.has(id));
+                    // 2. 同步分类（即使失敗也不影響整體同步成功）
+                    try {
+                        const categories = await this.localDB.getAll('categories');
+                        const localCatIds = new Set();
                         
-                        if (toDelete.length > 0) {
-                            const { error: deleteError } = await this.supabaseClient
+                        if (categories.length > 0) {
+                            const catData = categories.map(cat => {
+                                const catId = cat.id || crypto.randomUUID();
+                                localCatIds.add(catId);
+                                return {
+                                    id: catId,
+                                    user_id: currentUser.id,
+                                    name: cat.name,
+                                    icon: cat.icon,
+                                    color: cat.color,
+                                    updated_at: cat.updated_at || new Date().toISOString()
+                                };
+                            });
+
+                            const { error: catError } = await this.supabaseClient
                                 .from('categories')
-                                .delete()
-                                .in('id', toDelete);
-                            
-                            if (deleteError) {
-                                console.warn('⚠️ Failed to delete categories from cloud:', deleteError);
+                                .upsert(catData, { onConflict: 'id' });
+
+                            if (catError) {
+                                console.warn('⚠️ Failed to sync categories:', catError);
                             } else {
-                                console.log(`✅ Deleted ${toDelete.length} categories from cloud`);
+                                console.log(`✅ Synced ${categories.length} categories`);
+                            }
+                            
+                            // 2.1 删除云端中本地不存在的分类（实现真正的删除同步）
+                            const { data: cloudCategories, error: fetchCatError } = await this.supabaseClient
+                                .from('categories')
+                                .select('id')
+                                .eq('user_id', currentUser.id);
+                            
+                            if (!fetchCatError && cloudCategories) {
+                                const cloudCatIds = new Set(cloudCategories.map(cat => cat.id));
+                                const toDelete = Array.from(cloudCatIds).filter(id => !localCatIds.has(id));
+                                
+                                if (toDelete.length > 0) {
+                                    const { error: deleteError } = await this.supabaseClient
+                                        .from('categories')
+                                        .delete()
+                                        .in('id', toDelete);
+                                    
+                                    if (deleteError) {
+                                        console.warn('⚠️ Failed to delete categories from cloud:', deleteError);
+                                    } else {
+                                        console.log(`✅ Deleted ${toDelete.length} categories from cloud`);
+                                    }
+                                }
                             }
                         }
+                    } catch (catSyncError) {
+                        console.warn('⚠️ Category sync failed, but continuing:', catSyncError);
                     }
 
-                    // 3. 同步使用者設定
-                    const budgetSetting = await this.localDB.get('settings', 'budget');
-                    const themeSetting = await this.localDB.get('settings', 'themeId');
-                    const currencySetting = await this.localDB.get('settings', 'currency');
-                    const settingsUpdatedAt = await this.localDB.get('settings', 'settings_updated_at');
+                    // 3. 同步使用者設定（即使失敗也不影響整體同步成功）
+                    try {
+                        const budgetSetting = await this.localDB.get('settings', 'budget');
+                        const themeSetting = await this.localDB.get('settings', 'themeId');
+                        const currencySetting = await this.localDB.get('settings', 'currency');
+                        const settingsUpdatedAt = await this.localDB.get('settings', 'settings_updated_at');
 
-                    const now = new Date().toISOString();
-                    const settingsData = {
-                        user_id: currentUser.id,
-                        budget: budgetSetting ? budgetSetting.value : 30000,
-                        theme_id: themeSetting ? themeSetting.value : 'minimal',
-                        currency: currencySetting ? currencySetting.value : 'TWD',
-                        updated_at: settingsUpdatedAt ? settingsUpdatedAt.value : now,
-                        last_sync_at: now
-                    };
-
-                    const { error: settingsError } = await this.supabaseClient
-                        .from('user_settings')
-                        .upsert(settingsData, { onConflict: 'user_id' });
-
-                    if (settingsError) throw settingsError;
-                    console.log('✅ Synced user settings');
-
-                    // 3.5. 同步信用卡数据
-                    if (state.cards && state.cards.length > 0) {
-                        const cardData = state.cards.map(card => ({
-                            id: card.id,
+                        const now = new Date().toISOString();
+                        const settingsData = {
                             user_id: currentUser.id,
-                            name: card.name,
-                            closing_day: card.closingDay,
-                            due_days_after: card.dueDaysAfter,
-                            carrying_balance: card.carryingBalance || 0,
-                            initial_balance: card.initialBalance || 0,
-                            updated_at: card.updated_at || now,
-                            is_deleted: card.is_deleted || false
-                        }));
+                            budget: budgetSetting ? budgetSetting.value : 30000,
+                            theme_id: themeSetting ? themeSetting.value : 'minimal',
+                            currency: currencySetting ? currencySetting.value : 'TWD',
+                            updated_at: settingsUpdatedAt ? settingsUpdatedAt.value : now,
+                            last_sync_at: now
+                        };
 
-                        const { error: cardError } = await this.supabaseClient
-                            .from('credit_cards')
-                            .upsert(cardData, { onConflict: 'id' });
+                        const { error: settingsError } = await this.supabaseClient
+                            .from('user_settings')
+                            .upsert(settingsData, { onConflict: 'user_id' });
 
-                        if (cardError) throw cardError;
-                        console.log(`✅ Synced ${state.cards.length} credit cards`);
+                        if (settingsError) {
+                            console.warn('⚠️ Failed to sync user settings:', settingsError);
+                        } else {
+                            console.log('✅ Synced user settings');
+                        }
+                    } catch (settingsSyncError) {
+                        console.warn('⚠️ Settings sync failed, but continuing:', settingsSyncError);
+                    }
+
+                    // 3.5. 同步信用卡数据（即使失敗也不影響整體同步成功）
+                    try {
+                        if (state.cards && state.cards.length > 0) {
+                            const now = new Date().toISOString();
+                            const cardData = state.cards.map(card => ({
+                                id: card.id,
+                                user_id: currentUser.id,
+                                name: card.name,
+                                closing_day: card.closingDay,
+                                due_days_after: card.dueDaysAfter,
+                                carrying_balance: card.carryingBalance || 0,
+                                initial_balance: card.initialBalance || 0,
+                                updated_at: card.updated_at || now,
+                                is_deleted: card.is_deleted || false
+                            }));
+
+                            const { error: cardError } = await this.supabaseClient
+                                .from('credit_cards')
+                                .upsert(cardData, { onConflict: 'id' });
+
+                            if (cardError) {
+                                console.warn('⚠️ Failed to sync credit cards:', cardError);
+                            } else {
+                                console.log(`✅ Synced ${state.cards.length} credit cards`);
+                            }
+                        }
+                    } catch (cardSyncError) {
+                        console.warn('⚠️ Credit card sync failed, but continuing:', cardSyncError);
                     }
 
                     // 4. 執行雲端資料清理（刪除 365 天前的資料）
