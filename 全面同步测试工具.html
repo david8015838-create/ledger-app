@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全面同步测试工具</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4ade80;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #a0a0a0;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+        }
+        .test-section h2 {
+            color: #60a5fa;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .test-item {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #3b82f6;
+        }
+        .test-item h3 {
+            color: #fff;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .button {
+            background: #4ade80;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.2s;
+        }
+        .button:hover {
+            background: #22c55e;
+            transform: translateY(-2px);
+        }
+        .button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .button-secondary {
+            background: #3b82f6;
+        }
+        .button-secondary:hover {
+            background: #2563eb;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.pending {
+            background: #fbbf2420;
+            color: #fbbf24;
+        }
+        .status.success {
+            background: #22c55e20;
+            color: #4ade80;
+        }
+        .status.error {
+            background: #ef444420;
+            color: #f87171;
+        }
+        .result-box {
+            background: #0a0a0a;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            border: 1px solid #333;
+            white-space: pre-wrap;
+            color: #a0a0a0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .summary {
+            background: #1a3a1a;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 2px solid #22c55e;
+        }
+        .summary h2 {
+            color: #4ade80;
+            margin-bottom: 15px;
+        }
+        .summary-item {
+            margin: 8px 0;
+            padding: 8px;
+            background: #0a2a0a;
+            border-radius: 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 12px;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        th {
+            background: #1a1a1a;
+            color: #4ade80;
+            font-weight: bold;
+        }
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 全面同步测试工具</h1>
+        <p class="subtitle">测试所有功能的 Supabase 同步：币值、主题色、信用卡、预算、交易、分类</p>
+
+        <div class="test-section">
+            <h2>1. 登录状态</h2>
+            <button class="button" onclick="checkAuth()">检查登录</button>
+            <div id="authStatus"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. 用户设置同步测试</h2>
+            <div class="test-item">
+                <h3>预算 (Budget)</h3>
+                <button class="button" onclick="testBudgetSync()">测试预算同步</button>
+                <div id="budgetResult" class="result-box" style="display:none;"></div>
+            </div>
+            <div class="test-item">
+                <h3>币值 (Currency)</h3>
+                <button class="button" onclick="testCurrencySync()">测试币值同步</button>
+                <div id="currencyResult" class="result-box" style="display:none;"></div>
+            </div>
+            <div class="test-item">
+                <h3>主题色 (Theme & Custom Theme)</h3>
+                <button class="button" onclick="testThemeSync()">测试主题同步</button>
+                <div id="themeResult" class="result-box" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>3. 信用卡同步测试</h2>
+            <button class="button" onclick="testCreditCardSync()">测试信用卡同步</button>
+            <div id="cardResult" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. 交易记录同步测试</h2>
+            <button class="button" onclick="testTransactionSync()">测试交易同步</button>
+            <div id="transactionResult" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>5. 分类同步测试</h2>
+            <button class="button" onclick="testCategorySync()">测试分类同步</button>
+            <div id="categoryResult" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>6. 全面测试</h2>
+            <button class="button button-secondary" onclick="runAllTests()">运行所有测试</button>
+            <div id="allTestsResult" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div id="summary" class="summary" style="display:none;">
+            <h2>📊 测试总结</h2>
+            <div id="summaryContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://ndtkurowumazsgdotlxb.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kdGt1cm93dW1henNnZG90bHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMzUwMzUsImV4cCI6MjA4MzgxMTAzNX0.tukEU-T8f8Sne7KRFOPBYgtlhalHWaPMJlZ_Qpa6J6E';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let currentUser = null;
+        const testResults = {};
+
+        async function checkAuth() {
+            const statusDiv = document.getElementById('authStatus');
+            statusDiv.innerHTML = '<span class="loading"></span>检查中...';
+
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                
+                if (error) {
+                    statusDiv.innerHTML = `<span class="status error">❌ 错误: ${error.message}</span>`;
+                    return false;
+                }
+
+                if (!session || !session.user) {
+                    statusDiv.innerHTML = '<span class="status error">❌ 未登录</span><br><br>请先在主应用中登录，然后刷新此页面。';
+                    return false;
+                }
+
+                currentUser = session.user;
+                statusDiv.innerHTML = `<span class="status success">✅ 已登录</span><br><br>用户ID: ${currentUser.id}<br>邮箱: ${currentUser.email || 'N/A'}`;
+                return true;
+            } catch (error) {
+                statusDiv.innerHTML = `<span class="status error">❌ 检查失败: ${error.message}</span>`;
+                return false;
+            }
+        }
+
+        async function testBudgetSync() {
+            if (!await ensureAuth()) return;
+            const resultDiv = document.getElementById('budgetResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<span class="loading"></span>测试中...';
+
+            try {
+                // 读取当前设置
+                const { data: settings, error: readError } = await supabase
+                    .from('user_settings')
+                    .select('budget')
+                    .eq('user_id', currentUser.id)
+                    .single();
+
+                if (readError && readError.code !== 'PGRST116') {
+                    throw readError;
+                }
+
+                const currentBudget = settings?.budget || 30000;
+                const testBudget = currentBudget === 50000 ? 60000 : 50000;
+
+                // 测试写入
+                const { error: writeError } = await supabase
+                    .from('user_settings')
+                    .upsert({
+                        user_id: currentUser.id,
+                        budget: testBudget,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'user_id' });
+
+                if (writeError) throw writeError;
+
+                // 验证读取
+                const { data: verifySettings, error: verifyError } = await supabase
+                    .from('user_settings')
+                    .select('budget')
+                    .eq('user_id', currentUser.id)
+                    .single();
+
+                if (verifyError) throw verifyError;
+
+                const success = verifySettings.budget == testBudget;
+                testResults.budget = success;
+
+                resultDiv.innerHTML = success 
+                    ? `✅ 预算同步测试成功！\n\n当前预算: ${verifySettings.budget}\n测试值: ${testBudget}\n\n✅ 写入成功\n✅ 读取成功\n✅ 数据一致`
+                    : `❌ 预算同步测试失败\n\n期望: ${testBudget}\n实际: ${verifySettings.budget}`;
+            } catch (error) {
+                testResults.budget = false;
+                resultDiv.innerHTML = `❌ 测试失败: ${error.message}\n\n${JSON.stringify(error, null, 2)}`;
+            }
+        }
+
+        async function testCurrencySync() {
+            if (!await ensureAuth()) return;
+            const resultDiv = document.getElementById('currencyResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<span class="loading"></span>测试中...';
+
+            try {
+                const currencies = ['TWD', 'USD', 'SGD', 'JPY'];
+                const { data: settings } = await supabase
+                    .from('user_settings')
+                    .select('currency')
+                    .eq('user_id', currentUser.id)
+                    .single();
+
+                const currentCurrency = settings?.currency || 'TWD';
+                const testCurrency = currencies.find(c => c !== currentCurrency) || 'USD';
+
+                const { error } = await supabase
+                    .from('user_settings')
+                    .upsert({
+                        user_id: currentUser.id,
+                        currency: testCurrency,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'user_id' });
+
+                if (error) throw error;
+
+                const { data: verify } = await supabase
+                    .from('user_settings')
+                    .select('currency')
+                    .eq('user_id', currentUser.id)
+                    .single();
+
+                const success = verify.currency === testCurrency;
+                testResults.currency = success;
+
+                resultDiv.innerHTML = success
+                    ? `✅ 币值同步测试成功！\n\n当前币值: ${verify.currency}\n测试值: ${testCurrency}\n\n✅ 写入成功\n✅ 读取成功\n✅ 数据一致`
+                    : `❌ 币值同步测试失败\n\n期望: ${testCurrency}\n实际: ${verify.currency}`;
+            } catch (error) {
+                testResults.currency = false;
+                resultDiv.innerHTML = `❌ 测试失败: ${error.message}`;
+            }
+        }
+
+        async function testThemeSync() {
+            if (!await ensureAuth()) return;
+            const resultDiv = document.getElementById('themeResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<span class="loading"></span>测试中...';
+
+            try {
+                const themes = ['minimal', 'ocean', 'forest', 'sunset'];
+                const { data: settings } = await supabase
+                    .from('user_settings')
+                    .select('theme_id, custom_theme')
+                    .eq('user_id', currentUser.id)
+                    .single();
+
+                const currentTheme = settings?.theme_id || 'minimal';
+                const testTheme = themes.find(t => t !== currentTheme) || 'ocean';
+                const testCustomTheme = {
+                    color: '#ff6b6b',
+                    rgb: '255, 107, 107',
+                    opacity: 0.8,
+                    bg: '#1a1a1a'
+                };
+
+                // 测试主题ID
+                const { error: themeError } = await supabase
+                    .from('user_settings')
+                    .upsert({
+                        user_id: currentUser.id,
+                        theme_id: testTheme,
+                        custom_theme: testCustomTheme,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'user_id' });
+
+                if (themeError) throw themeError;
+
+                // 验证
+                const { data: verify } = await supabase
+                    .from('user_settings')
+                    .select('theme_id, custom_theme')
+                    .eq('user_id', currentUser.id)
+                    .single();
+
+                const themeSuccess = verify.theme_id === testTheme;
+                const customThemeSuccess = verify.custom_theme && verify.custom_theme.color === testCustomTheme.color;
+                testResults.theme = themeSuccess && customThemeSuccess;
+
+                resultDiv.innerHTML = testResults.theme
+                    ? `✅ 主题同步测试成功！\n\n主题ID: ${verify.theme_id}\n自定义主题: ${JSON.stringify(verify.custom_theme, null, 2)}\n\n✅ 主题ID同步成功\n✅ 自定义主题同步成功`
+                    : `❌ 主题同步测试失败\n\n主题ID: ${themeSuccess ? '✅' : '❌'}\n自定义主题: ${customThemeSuccess ? '✅' : '❌'}`;
+            } catch (error) {
+                testResults.theme = false;
+                resultDiv.innerHTML = `❌ 测试失败: ${error.message}`;
+            }
+        }
+
+        async function testCreditCardSync() {
+            if (!await ensureAuth()) return;
+            const resultDiv = document.getElementById('cardResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<span class="loading"></span>测试中...';
+
+            try {
+                const testCard = {
+                    id: 'test-card-' + Date.now(),
+                    user_id: currentUser.id,
+                    name: '测试信用卡',
+                    closing_day: 15,
+                    due_days_after: 7,
+                    carrying_balance: 1000,
+                    initial_balance: 0,
+                    updated_at: new Date().toISOString(),
+                    is_deleted: false
+                };
+
+                // 写入
+                const { error: writeError } = await supabase
+                    .from('credit_cards')
+                    .upsert(testCard, { onConflict: 'id' });
+
+                if (writeError) throw writeError;
+
+                // 读取
+                const { data: cards, error: readError } = await supabase
+                    .from('credit_cards')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .eq('is_deleted', false);
+
+                if (readError) throw readError;
+
+                const found = cards.find(c => c.id === testCard.id);
+                const success = found && found.name === testCard.name;
+                testResults.creditCard = success;
+
+                resultDiv.innerHTML = success
+                    ? `✅ 信用卡同步测试成功！\n\n找到 ${cards.length} 张信用卡\n测试卡: ${found.name}\n结账日: ${found.closing_day}\n\n✅ 写入成功\n✅ 读取成功\n✅ 数据一致`
+                    : `❌ 信用卡同步测试失败\n\n期望找到: ${testCard.name}\n实际找到: ${found ? found.name : '无'}`;
+            } catch (error) {
+                testResults.creditCard = false;
+                resultDiv.innerHTML = `❌ 测试失败: ${error.message}\n\n${error.code === 'PGRST202' ? '⚠️ credit_cards 表可能不存在，请先执行 SQL 迁移' : ''}`;
+            }
+        }
+
+        async function testTransactionSync() {
+            if (!await ensureAuth()) return;
+            const resultDiv = document.getElementById('transactionResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<span class="loading"></span>测试中...';
+
+            try {
+                const testTx = {
+                    id: Math.floor(Date.now()),
+                    user_id: currentUser.id,
+                    amount: 100.50,
+                    date: new Date().toISOString().split('T')[0],
+                    note: '测试交易',
+                    category: '测试分类',
+                    icon: '🧪',
+                    currency: 'TWD',
+                    payment_method: 'cash',
+                    updated_at: new Date().toISOString(),
+                    is_deleted: false
+                };
+
+                // 写入
+                const { error: writeError } = await supabase
+                    .from('transactions')
+                    .upsert(testTx, { onConflict: 'id' });
+
+                if (writeError) throw writeError;
+
+                // 读取
+                const { data: transactions, error: readError } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .eq('id', testTx.id)
+                    .single();
+
+                if (readError) throw readError;
+
+                const success = transactions && transactions.amount == testTx.amount;
+                testResults.transaction = success;
+
+                resultDiv.innerHTML = success
+                    ? `✅ 交易同步测试成功！\n\n交易ID: ${transactions.id}\n金额: ${transactions.amount}\n日期: ${transactions.date}\n分类: ${transactions.category}\n\n✅ 写入成功\n✅ 读取成功\n✅ 数据一致`
+                    : `❌ 交易同步测试失败`;
+            } catch (error) {
+                testResults.transaction = false;
+                resultDiv.innerHTML = `❌ 测试失败: ${error.message}\n\n${JSON.stringify(error, null, 2)}`;
+            }
+        }
+
+        async function testCategorySync() {
+            if (!await ensureAuth()) return;
+            const resultDiv = document.getElementById('categoryResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<span class="loading"></span>测试中...';
+
+            try {
+                const testCategory = {
+                    id: crypto.randomUUID(),
+                    user_id: currentUser.id,
+                    name: '测试分类',
+                    icon: '🧪',
+                    color: '#ff6b6b',
+                    updated_at: new Date().toISOString()
+                };
+
+                // 写入
+                const { error: writeError } = await supabase
+                    .from('categories')
+                    .upsert(testCategory, { onConflict: 'id' });
+
+                if (writeError) throw writeError;
+
+                // 读取
+                const { data: categories, error: readError } = await supabase
+                    .from('categories')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+
+                if (readError) throw readError;
+
+                const found = categories.find(c => c.id === testCategory.id);
+                const success = found && found.name === testCategory.name;
+                testResults.category = success;
+
+                resultDiv.innerHTML = success
+                    ? `✅ 分类同步测试成功！\n\n找到 ${categories.length} 个分类\n测试分类: ${found.name}\n图标: ${found.icon}\n颜色: ${found.color}\n\n✅ 写入成功\n✅ 读取成功\n✅ 数据一致`
+                    : `❌ 分类同步测试失败`;
+            } catch (error) {
+                testResults.category = false;
+                resultDiv.innerHTML = `❌ 测试失败: ${error.message}`;
+            }
+        }
+
+        async function runAllTests() {
+            if (!await ensureAuth()) return;
+            
+            const resultDiv = document.getElementById('allTestsResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<span class="loading"></span>运行所有测试...\n\n';
+
+            const tests = [
+                { name: '预算', fn: testBudgetSync },
+                { name: '币值', fn: testCurrencySync },
+                { name: '主题', fn: testThemeSync },
+                { name: '信用卡', fn: testCreditCardSync },
+                { name: '交易', fn: testTransactionSync },
+                { name: '分类', fn: testCategorySync }
+            ];
+
+            for (const test of tests) {
+                resultDiv.innerHTML += `\n测试 ${test.name}...\n`;
+                await test.fn();
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+            // 显示总结
+            showSummary();
+        }
+
+        function showSummary() {
+            const summaryDiv = document.getElementById('summary');
+            const contentDiv = document.getElementById('summaryContent');
+            summaryDiv.style.display = 'block';
+
+            const total = Object.keys(testResults).length;
+            const passed = Object.values(testResults).filter(r => r === true).length;
+            const failed = total - passed;
+
+            let html = `<div class="summary-item">总计: ${total} 项测试</div>`;
+            html += `<div class="summary-item" style="color: #4ade80;">通过: ${passed} 项 ✅</div>`;
+            html += `<div class="summary-item" style="color: ${failed > 0 ? '#f87171' : '#4ade80'};">失败: ${failed} 项 ${failed > 0 ? '❌' : ''}</div>`;
+            html += '<br><table><tr><th>测试项</th><th>状态</th></tr>';
+
+            for (const [key, value] of Object.entries(testResults)) {
+                html += `<tr><td>${key}</td><td style="color: ${value ? '#4ade80' : '#f87171'}">${value ? '✅ 通过' : '❌ 失败'}</td></tr>`;
+            }
+
+            html += '</table>';
+
+            contentDiv.innerHTML = html;
+        }
+
+        async function ensureAuth() {
+            if (!currentUser) {
+                const authOk = await checkAuth();
+                if (!authOk) {
+                    alert('请先登录');
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // 页面加载时检查登录
+        window.addEventListener('load', () => {
+            setTimeout(checkAuth, 500);
+        });
+    </script>
+</body>
+</html>
