@@ -2529,9 +2529,13 @@
                         console.log(`✅ Pulled ${categories.length} categories from cloud`);
                     }
 
-                    // 处理信用卡数据（完全替换）
+                    // 处理信用卡数据（合并逻辑：保留本地已删除的卡片）
+                    const localCardsData = localStorage.getItem('ledger_cards_v13');
+                    const localCards = localCardsData ? JSON.parse(localCardsData) : [];
+                    const localDeletedCards = localCards.filter(c => c.is_deleted === true); // 保留本地已删除的卡片
+                    
                     if (creditCards && creditCards.length > 0) {
-                        state.cards = creditCards.map(card => ({
+                        const cloudCards = creditCards.map(card => ({
                             id: card.id,
                             name: card.name,
                             closingDay: card.closing_day,
@@ -2541,14 +2545,27 @@
                             updated_at: card.updated_at,
                             is_deleted: card.is_deleted || false // 确保包含 is_deleted 字段
                         }));
+                        
+                        // 合并：如果本地有已删除的卡片，保留它们（不被云端数据覆盖）
+                        const cloudCardIds = new Set(cloudCards.map(c => c.id));
+                        const mergedCards = [...cloudCards];
+                        
+                        // 添加本地已删除但云端没有的卡片（保留删除状态）
+                        localDeletedCards.forEach(localCard => {
+                            if (!cloudCardIds.has(localCard.id)) {
+                                mergedCards.push(localCard);
+                            }
+                        });
+                        
+                        state.cards = mergedCards;
                         // 保存到 localStorage
                         localStorage.setItem('ledger_cards_v13', JSON.stringify(state.cards));
-                        console.log(`✅ Replaced local credit cards with ${creditCards.length} cloud credit cards`);
+                        console.log(`✅ Merged credit cards: ${cloudCards.length} from cloud + ${localDeletedCards.length} deleted locally = ${mergedCards.length} total`);
                     } else {
-                        // 如果云端没有信用卡，清除本地信用卡
-                        state.cards = [];
-                        localStorage.setItem('ledger_cards_v13', JSON.stringify([]));
-                        console.log('ℹ️ No credit cards in cloud, cleared local credit cards');
+                        // 如果云端没有信用卡，保留本地已删除的卡片
+                        state.cards = localDeletedCards;
+                        localStorage.setItem('ledger_cards_v13', JSON.stringify(state.cards));
+                        console.log(`ℹ️ No credit cards in cloud, kept ${localDeletedCards.length} locally deleted cards`);
                     }
 
                     // 处理用户设置（完全替换，不检查更新时间）
@@ -2597,9 +2614,13 @@
                         state.customTheme = null;
                     }
                     
-                    // 处理每月固定消费数据（完全替换）
+                    // 处理每月固定消费数据（合并逻辑：保留本地已删除的项目）
+                    const localRecurringData = localStorage.getItem('ledger_recurring_v1');
+                    const localRecurring = localRecurringData ? JSON.parse(localRecurringData) : [];
+                    const localDeletedRecurring = localRecurring.filter(r => r.is_deleted === true); // 保留本地已删除的项目
+                    
                     if (recurringTransactions && recurringTransactions.length > 0) {
-                        state.recurringTransactions = recurringTransactions.map(recurring => ({
+                        const cloudRecurring = recurringTransactions.map(recurring => ({
                             id: recurring.id,
                             note: recurring.note || null,
                             amount: roundToDecimal(parseFloat(recurring.amount), 2), // 确保金额四舍五入到2位小数
@@ -2613,14 +2634,27 @@
                             updated_at: recurring.updated_at,
                             is_deleted: recurring.is_deleted || false // 确保包含 is_deleted 字段
                         }));
+                        
+                        // 合并：如果本地有已删除的项目，保留它们（不被云端数据覆盖）
+                        const cloudRecurringIds = new Set(cloudRecurring.map(r => r.id));
+                        const mergedRecurring = [...cloudRecurring];
+                        
+                        // 添加本地已删除但云端没有的项目（保留删除状态）
+                        localDeletedRecurring.forEach(localRecurring => {
+                            if (!cloudRecurringIds.has(localRecurring.id)) {
+                                mergedRecurring.push(localRecurring);
+                            }
+                        });
+                        
+                        state.recurringTransactions = mergedRecurring;
                         // 保存到 localStorage
                         localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
-                        console.log(`✅ Replaced local recurring transactions with ${recurringTransactions.length} cloud recurring transactions`);
+                        console.log(`✅ Merged recurring transactions: ${cloudRecurring.length} from cloud + ${localDeletedRecurring.length} deleted locally = ${mergedRecurring.length} total`);
                     } else {
-                        // 如果云端没有每月固定消费，清除本地数据
-                        state.recurringTransactions = [];
-                        localStorage.setItem('ledger_recurring_v1', JSON.stringify([]));
-                        console.log('ℹ️ No recurring transactions in cloud, cleared local recurring transactions');
+                        // 如果云端没有每月固定消费，保留本地已删除的项目
+                        state.recurringTransactions = localDeletedRecurring;
+                        localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
+                        console.log(`ℹ️ No recurring transactions in cloud, kept ${localDeletedRecurring.length} locally deleted recurring transactions`);
                     }
 
                     return { success: true };
@@ -6499,9 +6533,18 @@
                 renderSettings();
                 renderHome();
                 
-                // 异步保存（不阻塞UI）
+                // 异步保存并同步到云端（不阻塞UI）
                 try {
                     await save();
+                    // 立即同步到云端，确保删除状态被保存
+                    if (syncManager && currentUser) {
+                        try {
+                            await syncManager.syncToCloud();
+                            console.log('✅ Deleted card synced to cloud');
+                        } catch (syncError) {
+                            console.warn('⚠️ Failed to sync deleted card to cloud:', syncError);
+                        }
+                    }
                 } catch (error) {
                     console.error('❌ Failed to save after delete:', error);
                 }
@@ -6687,9 +6730,18 @@
                 // 立即重新渲染，确保删除的项目从列表中消失
                 renderSettings();
                 
-                // 异步保存（不阻塞UI）
+                // 异步保存并同步到云端（不阻塞UI）
                 try {
                     await save();
+                    // 立即同步到云端，确保删除状态被保存
+                    if (syncManager && currentUser) {
+                        try {
+                            await syncManager.syncToCloud();
+                            console.log('✅ Deleted recurring transaction synced to cloud');
+                        } catch (syncError) {
+                            console.warn('⚠️ Failed to sync deleted recurring transaction to cloud:', syncError);
+                        }
+                    }
                 } catch (error) {
                     console.error('❌ Failed to save after delete:', error);
                 }
