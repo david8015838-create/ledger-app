@@ -2538,7 +2538,8 @@
                             dueDaysAfter: card.due_days_after,
                             carryingBalance: roundToDecimal(parseFloat(card.carrying_balance) || 0, 2), // 确保余额四舍五入到2位小数
                             initialBalance: roundToDecimal(parseFloat(card.initial_balance) || 0, 2), // 确保初始余额四舍五入到2位小数
-                            updated_at: card.updated_at
+                            updated_at: card.updated_at,
+                            is_deleted: card.is_deleted || false // 确保包含 is_deleted 字段
                         }));
                         // 保存到 localStorage
                         localStorage.setItem('ledger_cards_v13', JSON.stringify(state.cards));
@@ -2733,7 +2734,12 @@
                 const cardsData = localStorage.getItem('ledger_cards_v13');
                 if (cardsData) {
                     try {
-                        state.cards = JSON.parse(cardsData);
+                        const parsed = JSON.parse(cardsData);
+                        // 确保所有旧数据都有 is_deleted 字段（默认为 false）
+                        state.cards = parsed.map(c => ({
+                            ...c,
+                            is_deleted: c.is_deleted !== undefined ? c.is_deleted : false
+                        }));
                     } catch (e) {
                         console.warn('Failed to parse cards data:', e);
                         state.cards = [];
@@ -4541,10 +4547,11 @@
             let totalBill = 0;
             const cardBills = {}; // 按卡片分组
             
-            // 遍历所有信用卡交易
+            // 遍历所有信用卡交易（只考虑未删除的卡片）
+            const activeCards = state.cards.filter(c => c.is_deleted !== true);
             state.transactions.forEach(tx => {
                 if (tx.paymentMethod === 'credit' && tx.cardId) {
-                    const card = state.cards.find(c => c.id === tx.cardId);
+                    const card = activeCards.find(c => c.id === tx.cardId);
                     if (!card) return;
                     
                     // 计算本期应缴金额（考虑分期和利息）
@@ -5336,7 +5343,9 @@
             const [year, month] = monthStr.split('-').map(Number);
             const result = { total: 0, byCard: {} };
             
-            state.cards.forEach(card => {
+            // 只考虑未删除的卡片
+            const activeCards = state.cards.filter(c => c.is_deleted !== true);
+            activeCards.forEach(card => {
                 let cardTotal = 0;
                 let cardPrincipal = 0;
                 let cardInterest = 0;
@@ -5469,9 +5478,10 @@
                 } else {
                     cardSelectContainer.classList.remove('hidden');
                     cardSelect.disabled = false;
-                    // 更新信用卡下拉菜单
+                    // 更新信用卡下拉菜单（过滤掉已删除的卡片）
+                    const activeCards = state.cards.filter(c => c.is_deleted !== true);
                     cardSelect.innerHTML = '<option value="">請選擇信用卡</option>' + 
-                        state.cards.map(card => 
+                        activeCards.map(card => 
                             `<option value="${card.id}" ${state.tempCardId === card.id ? 'selected' : ''}>${card.name}</option>`
                         ).join('');
                     
@@ -5716,8 +5726,10 @@
             
             // 渲染信用卡列表
             const creditCardBill = calculateCreditCardBillThisMonth();
-            document.getElementById('settingsCardList').innerHTML = state.cards.length > 0 
-                ? state.cards.map(card => {
+            // 过滤掉已删除的信用卡
+            const activeCards = state.cards.filter(c => c.is_deleted !== true);
+            document.getElementById('settingsCardList').innerHTML = activeCards.length > 0 
+                ? activeCards.map(card => {
                     const cardBill = creditCardBill.byCard[card.id];
                     const billAmount = cardBill ? cardBill.amount : 0;
                     const carryingBalance = card.carryingBalance || 0;
@@ -6473,9 +6485,27 @@
         async function deleteCard(cardId) {
             if (!confirm('確定要刪除此信用卡嗎？')) return;
             
-            state.cards = state.cards.filter(c => c.id !== cardId);
-            await save();
-            renderSettings();
+            // 标记为已删除而不是直接删除，以便同步到云端
+            const index = state.cards.findIndex(c => c.id === cardId);
+            if (index !== -1) {
+                // 确保设置 is_deleted 为 true
+                state.cards[index].is_deleted = true;
+                state.cards[index].updated_at = new Date().toISOString();
+                
+                // 立即保存到 localStorage
+                localStorage.setItem('ledger_cards_v13', JSON.stringify(state.cards));
+                
+                // 立即重新渲染，确保删除的卡片从列表中消失
+                renderSettings();
+                renderHome();
+                
+                // 异步保存（不阻塞UI）
+                try {
+                    await save();
+                } catch (error) {
+                    console.error('❌ Failed to save after delete:', error);
+                }
+            }
         }
         
         // ============================================
@@ -6527,9 +6557,11 @@
             ).join('');
             
             // 填充信用卡選單
-            if (state.cards.length > 0) {
+            // 过滤掉已删除的卡片
+            const activeCards = state.cards.filter(c => c.is_deleted !== true);
+            if (activeCards.length > 0) {
                 cardSelect.innerHTML = '<option value="">請選擇信用卡</option>' + 
-                    state.cards.map(card => `<option value="${card.id}">${card.name}</option>`).join('');
+                    activeCards.map(card => `<option value="${card.id}">${card.name}</option>`).join('');
             } else {
                 cardSelect.innerHTML = '<option value="">請先在設定中新增信用卡</option>';
             }
