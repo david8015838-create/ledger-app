@@ -2609,7 +2609,8 @@
                             paymentMethod: recurring.payment_method || 'cash',
                             cardId: recurring.card_id || null,
                             lastCreated: recurring.last_created || null,
-                            updated_at: recurring.updated_at
+                            updated_at: recurring.updated_at,
+                            is_deleted: recurring.is_deleted || false // 确保包含 is_deleted 字段
                         }));
                         // 保存到 localStorage
                         localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
@@ -2743,7 +2744,12 @@
                 const recurringData = localStorage.getItem('ledger_recurring_v1');
                 if (recurringData) {
                     try {
-                        state.recurringTransactions = JSON.parse(recurringData);
+                        const parsed = JSON.parse(recurringData);
+                        // 确保所有旧数据都有 is_deleted 字段（默认为 false）
+                        state.recurringTransactions = parsed.map(r => ({
+                            ...r,
+                            is_deleted: r.is_deleted !== undefined ? r.is_deleted : false
+                        }));
                     } catch (e) {
                         console.warn('Failed to parse recurring transactions data:', e);
                         state.recurringTransactions = [];
@@ -2835,7 +2841,7 @@
             let hasNewTransactions = false;
             
             // 只处理未删除的定期交易
-            const activeRecurring = state.recurringTransactions.filter(r => !r.is_deleted);
+            const activeRecurring = state.recurringTransactions.filter(r => r.is_deleted !== true);
             
             for (const recurring of activeRecurring) {
                 if (!shouldCreateRecurringTransaction(recurring, today)) {
@@ -5758,7 +5764,8 @@
             
             // 渲染定期交易列表
             const frequencyMap = { daily: '每日', weekly: '每週', monthly: '每月', yearly: '每年' };
-            const activeRecurring = state.recurringTransactions.filter(r => !r.is_deleted);
+            // 过滤掉已删除的项目（包括 is_deleted 为 true 或 undefined 但应该被删除的）
+            const activeRecurring = state.recurringTransactions.filter(r => r.is_deleted !== true);
             document.getElementById('settingsRecurringList').innerHTML = activeRecurring.length > 0
                 ? activeRecurring.map(recurring => {
                     const symbol = getCurrencySymbol();
@@ -6638,12 +6645,23 @@
             // 标记为已删除而不是直接删除，以便同步到云端
             const index = state.recurringTransactions.findIndex(r => r.id === recurringId);
             if (index !== -1) {
+                // 确保设置 is_deleted 为 true
                 state.recurringTransactions[index].is_deleted = true;
                 state.recurringTransactions[index].updated_at = new Date().toISOString();
+                
+                // 立即保存到 localStorage
+                localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
+                
+                // 立即重新渲染，确保删除的项目从列表中消失
+                renderSettings();
+                
+                // 异步保存（不阻塞UI）
+                try {
+                    await save();
+                } catch (error) {
+                    console.error('❌ Failed to save after delete:', error);
+                }
             }
-            localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
-            await save();
-            renderSettings();
         }
         
         // 还款功能
