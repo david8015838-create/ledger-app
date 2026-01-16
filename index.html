@@ -2834,7 +2834,10 @@
             const todayStr = today.toISOString().slice(0, 10);
             let hasNewTransactions = false;
             
-            for (const recurring of state.recurringTransactions) {
+            // 只处理未删除的定期交易
+            const activeRecurring = state.recurringTransactions.filter(r => !r.is_deleted);
+            
+            for (const recurring of activeRecurring) {
                 if (!shouldCreateRecurringTransaction(recurring, today)) {
                     continue;
                 }
@@ -5755,8 +5758,9 @@
             
             // 渲染定期交易列表
             const frequencyMap = { daily: '每日', weekly: '每週', monthly: '每月', yearly: '每年' };
-            document.getElementById('settingsRecurringList').innerHTML = state.recurringTransactions.length > 0
-                ? state.recurringTransactions.map(recurring => {
+            const activeRecurring = state.recurringTransactions.filter(r => !r.is_deleted);
+            document.getElementById('settingsRecurringList').innerHTML = activeRecurring.length > 0
+                ? activeRecurring.map(recurring => {
                     const symbol = getCurrencySymbol();
                     const category = state.categories.find(c => c.name === recurring.category) || state.categories[0];
                     const nextDate = recurring.lastCreated ? new Date(recurring.lastCreated) : new Date(recurring.startDate);
@@ -6548,35 +6552,50 @@
         }
         
         async function confirmAddRecurring() {
-            const note = document.getElementById('recurringNote').value.trim();
-            const amount = parseFloat(document.getElementById('recurringAmount').value);
-            const category = document.getElementById('recurringCategory').value;
-            const frequency = document.getElementById('recurringFrequency').value;
-            const startDate = document.getElementById('recurringStartDate').value;
-            const endDate = document.getElementById('recurringEndDate').value || null;
-            const paymentMethod = document.getElementById('recurringPaymentMethod').value;
-            const cardId = paymentMethod === 'credit' ? (document.getElementById('recurringCardSelect').value || null) : null;
-            
-            if (!note) {
-                alert('請輸入備註');
-                return;
-            }
-            if (!amount || amount <= 0) {
-                alert('請輸入有效的金額');
-                return;
-            }
-            if (!startDate) {
-                alert('請選擇開始日期');
-                return;
-            }
-            
-            const now = new Date().toISOString();
-            const roundedAmount = roundToDecimal(amount, 2); // 确保金额四舍五入到2位小数
-            if (editingRecurringId) {
-                const index = state.recurringTransactions.findIndex(r => r.id === editingRecurringId);
-                if (index !== -1) {
-                    state.recurringTransactions[index] = {
-                        ...state.recurringTransactions[index],
+            try {
+                const note = document.getElementById('recurringNote').value.trim();
+                const amount = parseFloat(document.getElementById('recurringAmount').value);
+                const category = document.getElementById('recurringCategory').value;
+                const frequency = document.getElementById('recurringFrequency').value;
+                const startDate = document.getElementById('recurringStartDate').value;
+                const endDate = document.getElementById('recurringEndDate').value || null;
+                const paymentMethod = document.getElementById('recurringPaymentMethod').value;
+                const cardId = paymentMethod === 'credit' ? (document.getElementById('recurringCardSelect').value || null) : null;
+                
+                if (!note) {
+                    alert('請輸入備註');
+                    return;
+                }
+                if (!amount || amount <= 0) {
+                    alert('請輸入有效的金額');
+                    return;
+                }
+                if (!startDate) {
+                    alert('請選擇開始日期');
+                    return;
+                }
+                
+                const now = new Date().toISOString();
+                const roundedAmount = roundToDecimal(amount, 2); // 确保金额四舍五入到2位小数
+                if (editingRecurringId) {
+                    const index = state.recurringTransactions.findIndex(r => r.id === editingRecurringId);
+                    if (index !== -1) {
+                        state.recurringTransactions[index] = {
+                            ...state.recurringTransactions[index],
+                            note,
+                            amount: roundedAmount,
+                            category,
+                            frequency,
+                            startDate,
+                            endDate,
+                            paymentMethod,
+                            cardId,
+                            updated_at: now
+                        };
+                    }
+                } else {
+                    const recurring = {
+                        id: Date.now().toString(),
                         note,
                         amount: roundedAmount,
                         category,
@@ -6585,31 +6604,32 @@
                         endDate,
                         paymentMethod,
                         cardId,
-                        updated_at: now
+                        lastCreated: null,
+                        updated_at: now,
+                        is_deleted: false
                     };
+                    state.recurringTransactions.push(recurring);
                 }
-            } else {
-                const recurring = {
-                    id: Date.now().toString(),
-                    note,
-                    amount: roundedAmount,
-                    category,
-                    frequency,
-                    startDate,
-                    endDate,
-                    paymentMethod,
-                    cardId,
-                    lastCreated: null,
-                    updated_at: now
-                };
-                state.recurringTransactions.push(recurring);
+                
+                localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
+                
+                // 先关闭模态框并刷新显示
+                closeRecurringModal();
+                renderSettings();
+                renderHome();
+                
+                // 然后异步处理定期交易（不阻塞UI）
+                try {
+                    await processRecurringTransactions();
+                    renderSettings();
+                    renderHome();
+                } catch (error) {
+                    console.error('❌ Failed to process recurring transactions:', error);
+                }
+            } catch (error) {
+                console.error('❌ Failed to add recurring transaction:', error);
+                alert('新增定期交易時發生錯誤，請重試');
             }
-            
-            localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
-            await processRecurringTransactions();
-            renderSettings();
-            renderHome();
-            closeRecurringModal();
         }
         
         async function deleteRecurring(recurringId) {
@@ -6622,6 +6642,7 @@
                 state.recurringTransactions[index].updated_at = new Date().toISOString();
             }
             localStorage.setItem('ledger_recurring_v1', JSON.stringify(state.recurringTransactions));
+            await save();
             renderSettings();
         }
         
