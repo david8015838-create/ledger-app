@@ -6718,7 +6718,7 @@
             if (!confirm('確定要刪除此定期交易嗎？')) return;
             
             // 标记为已删除而不是直接删除，以便同步到云端
-            const index = state.recurringTransactions.findIndex(r => r.id === recurringId);
+            const index = state.recurringTransactions.findIndex(r => String(r.id) === String(recurringId));
             if (index !== -1) {
                 // 确保设置 is_deleted 为 true
                 state.recurringTransactions[index].is_deleted = true;
