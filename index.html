@@ -6481,7 +6481,7 @@
             const roundedInitialBalance = roundToDecimal(initialBalance, 2); // 确保初始余额四舍五入到2位小数
             if (editingCardId) {
                 // 编辑（保留原有的 carryingBalance）
-                const idx = state.cards.findIndex(c => c.id === editingCardId);
+                const idx = state.cards.findIndex(c => String(c.id) === String(editingCardId));
                 if (idx !== -1) {
                     const existingCard = state.cards[idx];
                     state.cards[idx] = {
@@ -6520,7 +6520,7 @@
             if (!confirm('確定要刪除此信用卡嗎？')) return;
             
             // 标记为已删除而不是直接删除，以便同步到云端
-            const index = state.cards.findIndex(c => c.id === cardId);
+            const index = state.cards.findIndex(c => String(c.id) === String(cardId));
             if (index !== -1) {
                 // 确保设置 is_deleted 为 true
                 state.cards[index].is_deleted = true;
@@ -6783,7 +6783,7 @@
                 return;
             }
             
-            const card = state.cards.find(c => c.id === paymentCardId);
+            const card = state.cards.find(c => String(c.id) === String(paymentCardId));
             if (!card) return;
             
             const creditCardBill = calculateCreditCardBillThisMonth();
@@ -6793,7 +6793,7 @@
             // 计算剩余未缴金额
             const remaining = billAmount - paymentAmount;
             
-            const cardIndex = state.cards.findIndex(c => c.id === paymentCardId);
+            const cardIndex = state.cards.findIndex(c => String(c.id) === String(paymentCardId));
             if (cardIndex !== -1) {
                 // 更新已還款總額（修復初始餘額重複計算 BUG）
                 const currentRepaid = state.cards[cardIndex].totalRepaid || 0;
